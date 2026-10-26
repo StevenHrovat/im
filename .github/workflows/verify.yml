@@ -19,5 +19,5 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: The pinned Lean toolchain (vendor/dmp/SETUP.md, L2)
-        run: echo "$(tools/lean-install.sh "$RUNNER_TEMP/lean")" >> "$GITHUB_PATH"
+        run: bin="$(tools/lean-install.sh "$RUNNER_TEMP/lean")" && echo "$bin" >> "$GITHUB_PATH"
       - run: tools/verify

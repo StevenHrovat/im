@@ -85,7 +85,7 @@ level of one IM sentence:
 | L4 legal names | DMP 04, encoding | `kind_names_ok` |
 | L5 a write says what it expects | C15 | `write_says_expect`, `read_execute_expect_any` |
 | I6 one canonical spelling | DMP 04 | `decode_encode` (for every well-formed sentence with any legal path), `decode_wf`, `decode_kind`, `trailing_byte_malformed`, `wrong_version_malformed`, `ill_formed_never_decodes` |
-| the door makes the composition sound | DMP 04, "What IM is" | `sound`, `galaxy_robust`, `galaxy_is_a_node`, `order_free`, `echo_alone_not_robust`, `im_makes_echo_sound` (Compose.lean, carried from cm-work cm#137) |
+| the door makes the composition sound | DMP 04, "What IM is" | `sound`, `galaxy_robust`, `galaxy_is_a_node`, `order_free`, `echo_alone_not_robust`, `im_makes_echo_sound` (Compose.lean, carried from the cm-work draft, pull request 137) |
 | the closure | the owner, 2026-10-26 | `closure`: every sentence keeps the decidable laws through its shape; `space_size` 72, `wf_space_size` 32, `kinds_size` 12, computed by the kernel |
 
 `proof/tools/check.sh` checks the pins and the setup file, refuses escape hatches (`sorry`, `axiom`, `native_decide`, …), builds, asks the

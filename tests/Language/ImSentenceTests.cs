@@ -46,7 +46,7 @@ public sealed class ImSentenceTests
     [InlineData("")]
     [InlineData("Toolchain")]
     [InlineData("a b")]
-    [InlineData("ä")]
+    [InlineData("\u00e9")]
     public void An_illegal_path_is_refused(string path)
     {
         Assert.False(new ImSentence(FileRead, path, ImMode.Dry, ImExpect.Any).IsWellFormed);
