@@ -31,6 +31,8 @@ and its laws: [docs/language.md](docs/language.md). The proof that every sentenc
 kernel: [proof/](proof/) (`proof/tools/check.sh`). The C# of the sentence: `src/Im/Language`. What IM stands on, with thanks:
 [docs/acknowledgements.md](docs/acknowledgements.md); what the proof found: [docs/findings.md](docs/findings.md).
 
+The SS1 verifier that `AGENTS.md` asks agents to use once it exists, a draft with no code yet: [docs/ss1-verifier.md](docs/ss1-verifier.md).
+
 IM holds DMP and Gravity in the versions it is intended for, byte for byte with a PIN ([vendor/](vendor/README.md), DMP 00 "The root
 chain"), and with them `vendor/dmp/SETUP.md`, the one setup file of the four root repositories: what to install, from where, with which
 hash. `tools/lean-install.sh` follows it.
