@@ -56,6 +56,15 @@ IM version 0 (`vendor/dmp/04-im.md`) stays as it is: one kind, `im.heartbeat`, a
 locked law. Sentences are IM version 1 payloads: the envelope of version 1 (two tokens, one signature, DMP 04 "IM version 1") carries the
 kind `<layer>.<verb>` and the payload below. Version 1 only adds (C18); nothing is locked yet (`DMP/im-lock.txt` in CM is empty).
 
+**Two tables, on purpose, until the version 1 verifier exists.** `ImKinds.Required` (one row, the heartbeat) is version 0's table; the
+version 0 verifier in CM's Milky Way (rule 13) consults it and nothing else, so today no sentence passes a door anywhere. `ImLanguage.Kinds`
+(twelve rows) is version 1's table; the version 1 verifier (the reference verifier, the next pull request) consults it. DMP 04 says a new
+kind is added to its table and to `ImKinds` in the same pull request; across two repositories that reads as: the DMP table first, the
+`im` code second, the CM re-pin third (`docs/findings.md` IF7).
+
+**The path alphabet is IM's addition.** DMP 04 defines the alphabets name, subject and printable and says nothing else is allowed; a path
+adds `/` and runs to 1024 bytes. That is a candidate sentence for the chapter (`docs/findings.md` IF8).
+
 ## On the wire
 
 The payload of a sentence (the envelope's `kind` field already names the kind):
@@ -94,11 +103,21 @@ kernel which axioms every theorem rests on (`propext`, `Quot.sound`, `Classical.
 table through the C#: every row reproduced, no C# shape the proof does not have. That is the exhaustive check DMP chapter 06 asks for
 ("IM: checked, exhaustively") in the shape Cedar uses (a Lean model, an engine tested against it; `docs/acknowledgements.md`).
 
-Each proven sentence is a lemma in the ledger of DMP chapter 06. Both chains (C22): this proof is stated from DMP 04 and this grammar;
-the evidence chain, written from the C#, lives in Gravity and never names these files.
+**Which chain this is, honestly (C22).** This proof is stated from DMP 04 and this grammar: by C22 that is the intent direction (what is
+meant becomes the protocol), even though it is written in Lean. The evidence chain for sentences, a model written from the C# by a session
+that never saw these files, does not exist yet; until both chains carry a sentence, it is argued, not proven, and the lemma ledger of
+DMP chapter 06 cannot mark it (a lemma needs both chains and the II-L attack on the sandbox). `docs/findings.md` IF6.
+
+**What the closure proves and what it does not.** It proves that every shape of the closed space keeps the laws above, and that the wire
+has one spelling. It does not prove anything about authority growing over time: Harrison, Ruzzo and Ullman (1976) show that safety is
+undecidable for a general access matrix even with the alphabet read, write, execute, and the decidable cases (Jones, Lipton and Snyder;
+Sandhu) need a closed table of kinds, tokens that only attenuate, and no command that creates authority. Those are hypotheses here, kept
+by construction (the table is closed; a token's permissions are sorted, distinct and at most sixteen; no sentence grants), and the theorem
+that attenuation only narrows (the permissions of an attenuated token are a subset of its parent's) is not written yet.
 
 ## What is not here yet
 
 The reference verifier (rules 1 to 16, today in CM's Milky Way) next to the codec, so a clone of DMP, Gravity and IM verifies a sentence on
-its own; the version 1 envelope with two tokens in this library; the class adjective (C3); the depth field (T32); the MCP facade of the
+its own; the second kernel (lean4export and nanoda) in IM's workflow, as Gravity runs it; the attenuation theorem; the evidence chain for
+sentences, written from the C#; the version 1 envelope with two tokens in this library; the class adjective (C3); the depth field (T32); the MCP facade of the
 cm.ii interfaces; the lemma ledger file. Findings the proof produced: `docs/findings.md`.

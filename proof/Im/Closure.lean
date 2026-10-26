@@ -9,6 +9,11 @@ decides the laws that are decidable per sentence, and the laws that quantify ove
 sentence (Laws.lean, Wire.lean). `closure` ties both: there is no sentence outside the list, and every one in it is lawful.
 
 Nothing here is vacuous: `space_size` is the count the kernel computes, and `Shape.all_complete` is the completeness.
+
+What this is not: a proof about authority over time. Safety for a general access matrix is undecidable even with the alphabet read,
+write, execute (Harrison, Ruzzo and Ullman, 1976); it is decidable under a closed table of kinds, tokens that only attenuate and no
+command that creates authority (Jones, Lipton and Snyder, 1976 and 1977; Sandhu, 1988 and 1992). Those are hypotheses this grammar keeps by
+construction, and the attenuation theorem is still to be written (docs/findings.md, IF9).
 -/
 namespace Im
 
