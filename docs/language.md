@@ -2,7 +2,7 @@
 
 IM, the Interstellar Medium, is the language of acts in a CMOS galaxy. DMP says what trust is: a witness trusts a part for an act at a
 time (`vendor/dmp/01-constitution.md`, the words). IM is the closed set of acts a part can speak, and the one shape every act is spoken in,
-so that every door decides every act the same way, with both witnesses' grants (Axiom 1, T1), and the record holds every one (Axiom 3).
+so that every door decides every act the same way, with both witnesses' grants (Axiom 1, T6), and the record holds every one (Axiom 3).
 The owner, 2026-10-26: "IM is defined by its ability to make DMP axiomatically sound" (`vendor/dmp/04-im.md`, "What IM is"), and "verbs
 reduce to read, write and execute over nouns and adjectives".
 
@@ -24,16 +24,16 @@ expect   := any | absent | present      a write says absent (create) or present 
 
 | Verb | Information flows | Keeps |
 |---|---|---|
-| read | from the noun to the part | T1 (a read on an enrolled part is inside, T19) |
+| read | from the noun to the part | T6 (a read on an enrolled part is inside, T12) |
 | write | from the part to the noun; the sentence says what it expects to find there | C15 (a write first reads what it changes), Axiom 3 |
-| execute | nowhere; the noun changes state (a job, a promotion, a seat) and only the record flows | T28 (enforcement is an act), Axiom 3 |
+| execute | nowhere; the noun changes state (a job, a promotion, a seat) and only the record flows | T17 (enforcement is an act), Axiom 3 |
 
 The verbs people type (pause, resume, explain, dry-run) are spellings, not verbs: each is exactly one sentence, so "one name in three
 spellings, never a fourth" holds and the permission and the proof see only read, write and execute. `pause` is `write job/x/control` with
 the word in the stream it opened; `explain` is `read job/x/plan`; a dry run is the `dry` adjective of any sentence.
 
 A token lists kinds, `<layer>.<verb>`: one row of Lampson's access matrix (1971). A sentence passes a door only when both tokens of the
-sender carry its kind (IM version 1, two chains; T1: the intersection). The layer places the noun and never grants (C12): who may act on
+sender carry its kind (IM version 1, two chains; T6: the intersection). The layer places the noun and never grants (C12): who may act on
 it comes only from the grants.
 
 ## The layers
@@ -43,7 +43,7 @@ it comes only from the grants.
 | `setup` | what a root repository needs to run itself (`vendor/dmp/SETUP.md`): `toolchain/<id>`, `host/<name>`, `pin/<repo>` | `setup.read toolchain/lean` (version, source, hash); `setup.write toolchain/lean apply absent` (install); `setup.execute check apply` (the check) |
 | `board` | the heartbeat board of Milky Way (DMP 05) | `board.write heartbeat apply present` (what `im.heartbeat` is in version 0) |
 | `file` | files (the files layer, C12); the bytes flow on the stream the sentence opened, never in the sentence | `file.read <path>`, `file.write <path> apply absent` |
-| `record` | the record of acts (Axiom 3): grants, uses, losses; counts for everyone, content by a grant (T21) | `record.read <path>`; an admission or an export is `record.write` (Axiom 3: every grant is a record), not a fourth verb |
+| `record` | the record of acts (Axiom 3): grants, uses, losses; counts for everyone, content by a grant (T14) | `record.read <path>`; an admission or an export is `record.write` (Axiom 3: every grant is a record), not a fourth verb |
 
 An interface of CM, `cm.ii.<layer>`, is one layer's noun family with its three verbs (the owner, 2026-10-26: cm.ii, Information
 Interfaces; a decision on the DMP chapter 02 text, which names `cm.io`, is the owner's and not made here). The interface names the kind
@@ -88,7 +88,7 @@ level of one IM sentence:
 
 | Law | DMP | Theorem |
 |---|---|---|
-| L1 both grants or refuse | Axiom 1, T1 | `pass_needs_both_grants`, `one_grant_never_passes` |
+| L1 both grants or refuse | Axiom 1, T6 | `pass_needs_both_grants`, `one_grant_never_passes` |
 | L2 fail closed | Axiom 1, C2.L2 | `nothing_granted_nothing_passes` |
 | L3 one permission per kind, no two kinds share one | DMP 04, kinds and permissions | `permissions_distinct` |
 | L4 legal names | DMP 04, encoding | `kind_names_ok` |
@@ -119,5 +119,5 @@ that attenuation only narrows (the permissions of an attenuated token are a subs
 
 The reference verifier (rules 1 to 16, today in CM's Milky Way) next to the codec, so a clone of DMP, Gravity and IM verifies a sentence on
 its own; the second kernel (lean4export and nanoda) in IM's workflow, as Gravity runs it; the attenuation theorem; the evidence chain for
-sentences, written from the C#; the version 1 envelope with two tokens in this library; the class adjective (C3); the depth field (T32); the MCP facade of the
+sentences, written from the C#; the version 1 envelope with two tokens in this library; the class adjective (C3); the depth field (T26); the MCP facade of the
 cm.ii interfaces; the lemma ledger file. Findings the proof produced: `docs/findings.md`.
