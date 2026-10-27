@@ -4,7 +4,7 @@ import Im.Grammar
 
 Each law is a DMP sentence stated at the level of one IM sentence, with the section it carries:
 
-- **L1, both grants or refuse** (Axiom 1, T1): a sentence passes a door only when both tokens carry its kind; the acts a part may do are
+- **L1, both grants or refuse** (Axiom 1, T6): a sentence passes a door only when both tokens carry its kind; the acts a part may do are
   the intersection of what each witness granted.
 - **L2, fail closed** (Axiom 1, C2.L2): a door that holds no grant passes nothing; there is no other way through.
 - **L3, one permission per kind** (DMP chapter 04): every kind names exactly one permission, and no two kinds share one.
@@ -26,7 +26,7 @@ inductive Verdict where
   | refuse | pass
   deriving DecidableEq, Repr
 
-/-- The door's decision on a sentence: both grants, or refuse (T1: the intersection). -/
+/-- The door's decision on a sentence: both grants, or refuse (T6: the intersection). -/
 def decideSentence (g : Grants) (s : Sentence) : Verdict :=
   if g.security s.kind && g.operational s.kind then .pass else .refuse
 
