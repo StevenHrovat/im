@@ -7,7 +7,11 @@ Mathlib-free.
 | Module | What it is |
 |---|---|
 | `Arsenal.R136a1` | The one way to leave a statement open: `R136a1 "name" P`, a named hypothesis, never an axiom (DMP chapters 01 and 06). |
-| `Arsenal.BSD` | Birch and Swinnerton-Dyer, what Mathlib alone gives: Mordell-Weil from weak Mordell-Weil, finite torsion, the analytic rank well defined, its parity from the functional equation, the existence line (`E(Q)` infinite exactly when `L(E, 1) = 0`, under BSD), point counts mod `p` that run and equal Mathlib's. It proves nothing open. |
+| `Arsenal.BSD` | Birch and Swinnerton-Dyer, what Mathlib alone gives, over any number field: `BSDStatement W`, a statement about the curve alone; the existence line (`E(K)` infinite exactly when `L(E, 1) = 0`, under BSD, with no finite generation assumed); the parity of the rank; the refined conjecture with every quantity Mathlib can derive derived. It proves nothing open. The module docstring lists what the first form carried that BSD does not need. |
+| `Arsenal.BSD.Algebraic` | `E(K)`, Mordell-Weil from weak Mordell-Weil (answered R136a1), finite torsion, the rank in `ℕ∞` (no junk value), rank zero exactly when `E(K)` is finite. |
+| `Arsenal.BSD.Analytic` | The continuation (analytic on a half-plane containing `s = 1`), the order at `s = 1` well defined, parity from a functional equation near `s = 1`. |
+| `Arsenal.BSD.Count` | Point counts over any finite ring, computable and checked by the kernel, proved equal to Mathlib's count over finite fields. |
+| `Arsenal.BSD.Hasse` | Hasse's bound, named (answered R136a1), and what it gives: the local coefficient bounds of Mathlib's `W.LFunction`, its first coefficient `1`, and a finite order of the zero at `s = 1` through one named Euler product step. |
 
 ## The gate
 
