@@ -13,7 +13,7 @@ Nothing here is vacuous: `space_size` is the count the kernel computes, and `Sha
 What this is not: a proof about authority over time. Safety for a general access matrix is undecidable even with the alphabet read,
 write, execute (Harrison, Ruzzo and Ullman, 1976); it is decidable under a closed table of kinds, tokens that only attenuate and no
 command that creates authority (Jones, Lipton and Snyder, 1976 and 1977; Sandhu, 1988 and 1992). Those are hypotheses this grammar keeps by
-construction, and the attenuation theorem is still to be written (docs/findings.md, IF9).
+construction; the attenuation theorem is in `Im/Attenuate.lean` (`attenuate_sub`, `attenuateAll_sub`; docs/findings.md, IF9).
 -/
 namespace Im
 

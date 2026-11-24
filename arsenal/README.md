@@ -12,6 +12,7 @@ Mathlib-free.
 | `Arsenal.BSD.Analytic` | The continuation (analytic on a half-plane containing `s = 1`), the order at `s = 1` well defined, parity from a functional equation near `s = 1`. |
 | `Arsenal.BSD.Count` | Point counts over any finite ring, computable and checked by the kernel, proved equal to Mathlib's count over finite fields. |
 | `Arsenal.BSD.Hasse` | Hasse's bound, named (answered R136a1), and what it gives: the local coefficient bounds of Mathlib's `W.LFunction`, its first coefficient `1`, and a finite order of the zero at `s = 1` through one named Euler product step. |
+| `Arsenal.BSD.EulerRat` | The Euler product bound over `ℚ`, proved (`eulerProductBound_rat`): products with Hasse-type coefficient bounds converge absolutely for `re s > 3/2`, dominated by `ζ(s - 1/2)^2`. So over `ℚ` only Hasse stays named, and the finite order at `s = 1` and parity follow from it alone. |
 
 ## The gate
 
