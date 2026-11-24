@@ -8,6 +8,10 @@ it rests on (the dual chain of trust, chain verdicts with roles as EKUs, enrolme
 Used by Milky Way (which also verifies), Doppler (which issues tokens) and any device agent or client (which knocks, answers the
 challenge and sends messages). It is its own library so that no CM constellation references another (constitution C1).
 
+**A second reading of the letters: Identity Multiplication.** The name stays the Interstellar Medium. The letters also read true as
+Identity Multiplication: the arsenal's rotation API (`arsenal/Arsenal/Rotation.lean`) is multiplication by a number on the unit
+circle, which keeps the norm and moves only the phase, so what is carried keeps its identity across every step.
+
 
 | Type | What it is | Used by |
 |---|---|---|
