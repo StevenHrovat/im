@@ -6,3 +6,4 @@ import Arsenal.R136a1
 import Arsenal.BSD
 import Arsenal.BSD.EulerRat
 import Arsenal.Rotation
+import Arsenal.Rigidity
