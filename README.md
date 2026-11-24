@@ -35,6 +35,13 @@ IM holds DMP and Gravity in the versions it is intended for, byte for byte with 
 chain"), and with them `vendor/dmp/SETUP.md`, the one setup file of the four root repositories: what to install, from where, with which
 hash. `tools/lean-install.sh` follows it.
 
+## The arsenal
+
+[arsenal/](arsenal/README.md) holds IM's transferable Lean results that need Mathlib (Lean v4.34.0, Mathlib v4.34.0, nothing else),
+imported from here only. Its gate is a lint: a change contains nothing that cannot run, so nothing that cannot be soundly constructed; a
+statement left open is answered R136a1 (a named hypothesis), never `sorry`. First piece: the Mathlib-only core of Birch and
+Swinnerton-Dyer.
+
 ## Build and test
 
 ```
@@ -42,6 +49,7 @@ tools/verify             # the one gate: pins, the setup file, the scrub scan, b
 dotnet build Im.slnx
 dotnet test Im.slnx
 proof/tools/check.sh     # the proof alone (lean and lake on the PATH: tools/lean-install.sh)
+arsenal/tools/check.sh   # the arsenal: lint, build against Mathlib, axiom report (arsenal/README.md)
 ```
 
 C# on .NET 10, no dependency beyond the base class library. Package versions live in `Directory.Packages.props` only.
