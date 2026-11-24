@@ -13,6 +13,7 @@ Mathlib-free.
 | `Arsenal.BSD.Count` | Point counts over any finite ring, computable and checked by the kernel, proved equal to Mathlib's count over finite fields. |
 | `Arsenal.BSD.Hasse` | Hasse's bound, named (answered R136a1), and what it gives: the local coefficient bounds of Mathlib's `W.LFunction`, its first coefficient `1`, and a finite order of the zero at `s = 1` through one named Euler product step. |
 | `Arsenal.BSD.EulerRat` | The Euler product bound over `ℚ`, proved (`eulerProductBound_rat`): products with Hasse-type coefficient bounds converge absolutely for `re s > 3/2`, dominated by `ζ(s - 1/2)^2`. So over `ℚ` only Hasse stays named, and the finite order at `s = 1` and parity follow from it alone. |
+| `Arsenal.Rotation` | The rotation API: a box with one command (the step at the one shared gate), its gate factor, a margin and a marker per step, `inside` or `r136a1`; the marker is correct when it agrees with the gate's own verdict, and DMP-complete means correct at every tick. The one-box certificate (one step at the shared gate certifies every tick), the scale certificate (every scale, from the sharing answered R136a1), the half-turn (the outside read through the same gate), a finite check, and the vacuity checks (a marker read off the gate always passes). |
 
 ## The gate
 

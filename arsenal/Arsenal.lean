@@ -5,3 +5,4 @@ Released under the Apache License 2.0.
 import Arsenal.R136a1
 import Arsenal.BSD
 import Arsenal.BSD.EulerRat
+import Arsenal.Rotation
