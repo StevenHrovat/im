@@ -113,11 +113,12 @@ has one spelling. It does not prove anything about authority growing over time: 
 undecidable for a general access matrix even with the alphabet read, write, execute, and the decidable cases (Jones, Lipton and Snyder;
 Sandhu) need a closed table of kinds, tokens that only attenuate, and no command that creates authority. Those are hypotheses here, kept
 by construction (the table is closed; a token's permissions are sorted, distinct and at most sixteen; no sentence grants), and the theorem
-that attenuation only narrows (the permissions of an attenuated token are a subset of its parent's) is not written yet.
+that attenuation only narrows (the permissions of an attenuated token are a subset of its parent's) is proved in `proof/Im/Attenuate.lean`
+(`attenuate_sub`; a chain of attenuations is the intersection of the root with its caveats, in any order: `attenuateAll_eq`, `attenuateAll_perm`).
 
 ## What is not here yet
 
 The reference verifier (rules 1 to 16, today in CM's Milky Way) next to the codec, so a clone of DMP, Gravity and IM verifies a sentence on
-its own; the second kernel (lean4export and nanoda) in IM's workflow, as Gravity runs it; the attenuation theorem; the evidence chain for
+its own; the second kernel (lean4export and nanoda) in IM's workflow, as Gravity runs it; the evidence chain for
 sentences, written from the C#; the version 1 envelope with two tokens in this library; the class adjective (C3); the depth field (T32); the MCP facade of the
 cm.ii interfaces; the lemma ledger file. Findings the proof produced: `docs/findings.md`.

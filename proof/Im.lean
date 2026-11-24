@@ -5,3 +5,4 @@ import Im.Laws
 import Im.Wire
 import Im.Compose
 import Im.Closure
+import Im.Attenuate
