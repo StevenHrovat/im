@@ -4,6 +4,7 @@ settled. On Lean's kernel alone.
 Released under the Apache License 2.0.
 -/
 import ArsenalCore.Optimizer
+import ArsenalCore.R136a1
 
 /-!
 # Insights: eight, and their references
@@ -12,7 +13,7 @@ Gravity's Draft 6, R.12l. The first author's reading: the Insights recorded on D
 makes the record impossible to reconstruct from any other configuration in exactly the same way. The exact parts proved here:
 
 * **0ne1, the pigeonhole** (`«0ne1»`, the first author's name for it in the logic): an injective map from `n` places into `m` values
-  needs `n ≤ m`. Proved by induction, no library.
+  needs `n ≤ m`. Proved by induction, no library, and issued as the token `R136a1 "0ne1"` (`«0ne1».token`).
 * **Eight bits, no fewer** (`bits_single_out_iff`): `2^8 = 256` configurations can be told apart by `k` bits exactly when `k ≥ 8`;
   seven bits give `128` values, so two configurations would look the same (`seven_bits_collide`).
 * **The Insights' references** (`insightUses`): the eight Insights in time order, a use where an Insight's text refers to an earlier
@@ -47,6 +48,11 @@ theorem «0ne1» : ∀ (n m : Nat) (f : Nat → Nat), (∀ i, i < n → f i < m)
       exact hi i j (by omega) (by omega) key
     have := «0ne1» n (m - 1) g hgb hgi
     omega
+
+/-- **0ne1 as a token**: the pigeonhole issued under its name, as every API input and output is (`Arsenal.R136a1`). -/
+theorem «0ne1».token : Arsenal.R136a1 "0ne1" (∀ (n m : Nat) (f : Nat → Nat), (∀ i, i < n → f i < m) →
+    (∀ i j, i < n → j < n → f i = f j → i = j) → n ≤ m) :=
+  Arsenal.R136a1.of «0ne1»
 
 /-- Configurations of `k` bits can be told apart from the `256` of a byte exactly when there are at least `256` of them. -/
 def SinglesOut (k : Nat) : Prop :=
