@@ -36,6 +36,10 @@ public sealed class TrustAnchors(IReadOnlyList<X509Certificate2> roots, IRevocat
         chain.ChainPolicy.DisableCertificateDownloads = true;
 
         var built = chain.Build(leaf);
+        // The decision rests only on what was presented and on the roots. Windows' chain engine keeps certificates it saw in earlier builds
+        // of the same process and may complete a chain from them (a certificate with the same name and other keys then reads as a bad
+        // signature); a chain that uses any certificate neither presented nor a root does not reach a trusted root from what was presented.
+        if (UsesUnpresented(chain, intermediates)) return new(ChainRefusal.UntrustedRoot);
         var flags = chain.ChainStatus.Aggregate(X509ChainStatusFlags.NoError, (all, s) => all | s.Status);
         if (!built || flags != X509ChainStatusFlags.NoError)
         {
@@ -48,6 +52,18 @@ public sealed class TrustAnchors(IReadOnlyList<X509Certificate2> roots, IRevocat
         foreach (var element in chain.ChainElements)
             if (revocations.IsRevoked(element.Certificate)) return new(ChainRefusal.Revoked);
         return ChainVerdict.Accepted;
+    }
+
+    /// <summary>True when the built chain, above the leaf, holds a certificate that is neither one of the presented intermediates nor a root.</summary>
+    bool UsesUnpresented(X509Chain chain, IReadOnlyList<X509Certificate2> intermediates)
+    {
+        for (var i = 1; i < chain.ChainElements.Count; i++)
+        {
+            var raw = chain.ChainElements[i].Certificate.RawDataMemory;
+            if (!intermediates.Any(c => c.RawDataMemory.Span.SequenceEqual(raw.Span)) && !roots.Any(c => c.RawDataMemory.Span.SequenceEqual(raw.Span)))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>The leaf must carry the role's EKU explicitly; a certificate without an EKU extension is refused for every role.</summary>

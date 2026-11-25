@@ -81,6 +81,22 @@ public sealed class TrustAnchorsTests : IDisposable
     }
 
     [Fact]
+    public void A_certificate_seen_in_an_earlier_check_but_not_presented_never_decides()
+    {
+        // A twin authority: the same names, other keys. Checking its chain lets the platform's chain engine see its issuing
+        // certificate (Windows keeps such certificates for later builds in the same process).
+        using var twin = new SandboxAuthority("sandbox", CaFrom);
+        var other = twin.Issue(TrustRole.Device, "device", LeafFrom, LeafTo);
+        Assert.True(twin.Anchors().Validate(other.Certificate, other.Chain, TrustRole.Device, Now).Ok);
+
+        // The decision rests only on what is presented and on the roots: the twin's issuing certificate, never presented, does not decide.
+        var leaf = ca.Issue(TrustRole.Device, "device", LeafFrom, LeafTo);
+        Assert.Equal(ChainRefusal.UntrustedRoot, ca.Anchors().Validate(leaf.Certificate, [foreign.Issuing], TrustRole.Device, Now).Refusal);
+        Assert.Equal(ChainRefusal.UntrustedRoot, ca.Anchors().Validate(leaf.Certificate, [], TrustRole.Device, Now).Refusal);
+        Assert.True(ca.Anchors().Validate(leaf.Certificate, leaf.Chain, TrustRole.Device, Now).Ok);
+    }
+
+    [Fact]
     public void Expired_and_not_yet_valid_leaves_are_refused()
     {
         var leaf = ca.Issue(TrustRole.Device, "device", LeafFrom, LeafTo);
