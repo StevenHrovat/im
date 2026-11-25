@@ -11,7 +11,8 @@ import ArsenalCore.Optimizer
 Gravity's Draft 6, R.12l. The first author's reading: the Insights recorded on DMP's pull request #25 reduce to no fewer than 8, which
 makes the record impossible to reconstruct from any other configuration in exactly the same way. The exact parts proved here:
 
-* **Pigeonhole** (`pigeonhole`): an injective map from `n` places into `m` values needs `n ≤ m`. Proved by induction, no library.
+* **0ne1, the pigeonhole** (`«0ne1»`, the first author's name for it in the logic): an injective map from `n` places into `m` values
+  needs `n ≤ m`. Proved by induction, no library.
 * **Eight bits, no fewer** (`bits_single_out_iff`): `2^8 = 256` configurations can be told apart by `k` bits exactly when `k ≥ 8`;
   seven bits give `128` values, so two configurations would look the same (`seven_bits_collide`).
 * **The Insights' references** (`insightUses`): the eight Insights in time order, a use where an Insight's text refers to an earlier
@@ -25,8 +26,8 @@ namespace ArsenalCore.Insights
 
 open ArsenalCore.Matrix
 
-/-- **Pigeonhole**: an injective map from the first `n` naturals into the first `m` needs `n ≤ m`. -/
-theorem pigeonhole : ∀ (n m : Nat) (f : Nat → Nat), (∀ i, i < n → f i < m) →
+/-- **0ne1, the pigeonhole**: an injective map from the first `n` naturals into the first `m` needs `n ≤ m`. -/
+theorem «0ne1» : ∀ (n m : Nat) (f : Nat → Nat), (∀ i, i < n → f i < m) →
     (∀ i j, i < n → j < n → f i = f j → i = j) → n ≤ m
   | 0, _, _, _, _ => Nat.zero_le _
   | n + 1, m, f, hb, hi => by
@@ -44,7 +45,7 @@ theorem pigeonhole : ∀ (n m : Nat) (f : Nat → Nat), (∀ i, i < n → f i < 
       have e' : (if f i < f n then f i else f i - 1) = (if f j < f n then f j else f j - 1) := e
       have key : f i = f j := by split at e' <;> split at e' <;> omega
       exact hi i j (by omega) (by omega) key
-    have := pigeonhole n (m - 1) g hgb hgi
+    have := «0ne1» n (m - 1) g hgb hgi
     omega
 
 /-- Configurations of `k` bits can be told apart from the `256` of a byte exactly when there are at least `256` of them. -/
@@ -55,7 +56,7 @@ def SinglesOut (k : Nat) : Prop :=
 theorem bits_single_out_iff (k : Nat) : SinglesOut k ↔ 8 ≤ k := by
   constructor
   · intro ⟨f, hb, hi⟩
-    have h := pigeonhole 256 (2 ^ k) f hb hi
+    have h := «0ne1» 256 (2 ^ k) f hb hi
     by_cases hk : 8 ≤ k
     · exact hk
     · exfalso
