@@ -206,6 +206,12 @@ public sealed class ImEdgeTests : IDisposable
         Assert.Throws<ImClientException>(() => client.CheckGate(broken));
         Assert.Equal(ImChannelState.Knocked, client.State);
 
+        // A well-formed accept whose signature is wrong is not verified either: still Knocked.
+        var badSignature = (byte[])accept.Clone();
+        badSignature[^1] ^= 0x01;
+        Assert.Equal(ImClientError.BadGateSignature, Assert.Throws<ImClientException>(() => client.CheckGate(badSignature)).Error);
+        Assert.Equal(ImChannelState.Knocked, client.State);
+
         // The gate's accept verifies: the request is proper and its satisfaction open. Answering the challenge happens inside Moin.
         Assert.NotNull(client.Respond(accept));
         Assert.Equal(ImChannelState.Moin, client.State);

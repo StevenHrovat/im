@@ -85,13 +85,13 @@ theorem box_correct_iff (n : ℕ) : R.box.Correct n ↔ ∃ g : R.E, R.act g R.b
   by_cases h : ∃ g : R.E, R.act g R.base = R.enum n
   · have h0 : R.box.fac n ≤ R.box.θ := by
       show (if ∃ g : R.E, R.act g R.base = R.enum n then (0 : ℝ) else 1) ≤ 1 / 2
-      rw [if_pos h]; norm_num
-    rw [if_pos h0]
+      rw [ite_eq_left h]; norm_num
+    rw [ite_eq_left h0]
     exact ⟨fun _ => h, fun _ => rfl⟩
   · have h1 : ¬ R.box.fac n ≤ R.box.θ := by
       show ¬ (if ∃ g : R.E, R.act g R.base = R.enum n then (0 : ℝ) else 1) ≤ 1 / 2
-      rw [if_neg h]; norm_num
-    rw [if_neg h1]
+      rw [ite_eq_right h]; norm_num
+    rw [ite_eq_right h1]
     exact ⟨fun e => absurd e (fun e' => Marker.noConfusion e'), fun e => absurd e h⟩
 
 theorem box_iterate (n : ℕ) : R.box.step^[n] (0 : ℕ) = n := by

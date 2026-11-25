@@ -121,7 +121,7 @@ theorem prod_trivialAt (hc : ∀ i, PowerSeries.coeff 0 (c i) = 1) {p : ℕ} (hp
 theorem eulerProduct_prime_pow (hP : Function.Injective P) (hc : ∀ i, PowerSeries.coeff 0 (c i) = 1) (i : ι) (k : ℕ) :
     eulerProduct (factors P c) ((P i : ℕ) ^ k) = PowerSeries.coeff k (c i) := by
   classical
-  haveI := northcott_primes P hP
+  have := northcott_primes P hP
   have hev : ∀ᶠ s in atTop, (∏ j ∈ s, factors P c j) ((P i : ℕ) ^ k) =
       eulerProduct (factors P c) ((P i : ℕ) ^ k) :=
     tendsTo_eulerProduct_ofPowerSeries (fun i => (P i : ℕ)) c
@@ -156,7 +156,7 @@ theorem sqrt_eq_prod_primeFactors {n : ℕ} (hn : n ≠ 0) :
     rw [← mul_pow, Real.mul_self_sqrt (Nat.cast_nonneg _), Nat.cast_pow]
   rw [Finset.prod_congr rfl this, ← Nat.cast_prod]
   congr 1
-  conv_lhs => rw [← Nat.factorization_prod_pow_eq_self hn]
+  conv_lhs => rw [← Nat.prod_factorization_pow_eq_self hn]
   rw [Finsupp.prod, Nat.support_factorization]
 
 variable (P c) in

@@ -5,12 +5,15 @@ and imported from here only (never copied). Lean v4.34.0 and Mathlib v4.34.0, no
 Mathlib-free.
 
 **The core (`arsenal/core`)**: the verify toy's finite layer, a package of its own with no requirement at all, not even Mathlib
-(`ArsenalCore.Toy`: the string `vxunderground`, smelly, Moin as the leading zero, and that a bit rotation is never smelly). Every
-statement there is about finitely many bits, so Lean's kernel decides it by evaluation; most rest on no axiom at all. It builds in
-seconds with nothing to download, so `tools/verify`, and with it the verify workflow, builds and audits it on every change
-(`arsenal/core/tools/check.sh`). Mathlib is not trusted here either: the kernel checks every Mathlib proof again. What the arsenal
-takes from Mathlib is its definitions of infinite objects (the complex numbers, the circle, the integral), which no evaluation can
-establish; that layer imports Mathlib as an API.
+(`ArsenalCore.Toy`: the string `vxunderground`, smelly, Moin as the leading zero, and that a bit rotation is never smelly). The facts
+about bytes and the string are decided by the kernel's evaluation; the general facts about `n`-bit words are proved from Lean's core
+lemmas on natural numbers; most rest on no axiom at all. It builds in seconds with nothing to download, so `tools/verify`, and with it
+the verify workflow, builds and audits it on every change (`arsenal/core/tools/check.sh`). Lean need not trust a library: every Mathlib proof is a term that a small kernel can check again (the de Bruijn
+criterion). Mathlib's own build does; prebuilt files fetched by `lake exe cache get` are loaded without a new check, and a
+replay (Lean's `lean4checker`, or a second kernel such as nanoda over `lean4export`) repeats the check locally. What is trusted
+is the kernel, with its built-in arithmetic on natural numbers, Lean's prelude definitions and the axioms the report lists. What the arsenal takes
+from Mathlib is its definitions of infinite objects (the complex numbers, the circle, the integral), which no evaluation can establish
+and which are read, not computed; that layer imports Mathlib as an API.
 
 | Module | What it is |
 |---|---|
