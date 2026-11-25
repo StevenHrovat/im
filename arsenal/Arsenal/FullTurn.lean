@@ -31,6 +31,8 @@ one statement.
   gives (`hsum`, `hbase`) are all it uses.
 * `full_turn_balance_log`: the same as free energies, `log (1 + √N) ≤ log (z o / z k)` or `≤ log (ε o' / ε e)`. For `N = 2` this
   is the hand-over rate `log (1 + √2)` of the twist and electric free energies.
+* `full_turn_balance_mean`: the same for the *mean* free energy over all nontrivial values of one type. A maximum over sectors
+  is a rate along a path that turns once through the sectors, the base point (the shared root) left out.
 
 Mathlib alone, nothing open.
 -/
@@ -268,5 +270,95 @@ theorem full_turn_balance_log {ι κ : Type*} [Fintype ι] [Fintype κ] [Decidab
   rcases full_turn_balance hι hκ hN o o' z ε hz hε hsum hbase with ⟨k, hk, h⟩ | ⟨e, he, h⟩
   · exact Or.inl ⟨k, hk, Real.log_le_log hpos ((le_div_iff₀ (hz k)).2 h)⟩
   · exact Or.inr ⟨e, he, Real.log_le_log hpos ((le_div_iff₀ (hε e)).2 h)⟩
+
+/-! ## The balance along a path: the mean over one turn -/
+
+/-- Jensen for the logarithm, as a mean over a nonempty finite set. -/
+private lemma mean_log_le {α : Type*} {T : Finset α} {r : α → ℝ} (hT : T.Nonempty) (hr : ∀ i ∈ T, 0 < r i) :
+    (∑ i ∈ T, Real.log (r i)) / T.card ≤ Real.log ((∑ i ∈ T, r i) / T.card) := by
+  have hc : (0 : ℝ) < T.card := by exact_mod_cast hT.card_pos
+  have h := (strictConcaveOn_log_Ioi.concaveOn).le_map_sum (t := T) (w := fun _ => ((T.card : ℝ))⁻¹) (p := r)
+    (fun _ _ => inv_nonneg.2 hc.le) (by rw [Finset.sum_const, nsmul_eq_mul]; field_simp)
+    (fun i hi => Set.mem_Ioi.2 (hr i hi))
+  simp only [smul_eq_mul, ← Finset.mul_sum] at h
+  rw [div_eq_inv_mul, div_eq_inv_mul]
+  exact h
+
+/-- The two strict inequalities the balance excludes, in sums. -/
+private lemma balance_core {N : ℕ} (hN : 2 ≤ N) {zo εo S W : ℝ} (hzo : 0 < zo) (hεo : 0 < εo)
+    (hbase : (N : ℝ) * εo = zo + S) (hW : W = zo - εo) :
+    ¬ (((N : ℝ) - 1) * zo < (1 + √(N : ℝ)) * S ∧ ((N : ℝ) - 1) * εo < (1 + √(N : ℝ)) * W) := by
+  rintro ⟨h1, h2⟩
+  set s := √(N : ℝ) with hs
+  have hNpos : (0 : ℝ) < N := by exact_mod_cast (show 0 < N by omega)
+  have hs0 : 0 < s := Real.sqrt_pos.2 hNpos
+  have hss : s * s = N := Real.mul_self_sqrt hNpos.le
+  rw [hW] at h2
+  have hA : ((N : ℝ) + s) * εo < (1 + s) * zo := by nlinarith
+  have hB : ((N : ℝ) + s) * (zo + S) < (N : ℝ) * (1 + s) * zo := by
+    rw [← hbase]; nlinarith
+  have hC : ((N : ℝ) + s) * zo < (1 + s) * (zo + S) := by nlinarith
+  have hp : (0 : ℝ) < N + s := by linarith
+  have hD : ((N : ℝ) + s) * ((N : ℝ) + s) * zo < ((N : ℝ) + s) * ((1 + s) * (zo + S)) := by
+    nlinarith [mul_lt_mul_of_pos_left hC hp]
+  have hE : ((N : ℝ) + s) * (zo + S) * (1 + s) < (N : ℝ) * (1 + s) * zo * (1 + s) :=
+    mul_lt_mul_of_pos_right hB (by linarith)
+  nlinarith [hss]
+
+/-- The mean free energy of one type is at least `log (1 + √N)` once the sum of its values is small enough. -/
+private lemma mean_free_energy_ge {α : Type*} {N : ℕ} (hN : 2 ≤ N) (A : Finset α) (a0 : ℝ) (a : α → ℝ) (hA : A.Nonempty)
+    (hcard : (A.card : ℝ) = (N : ℝ) - 1) (ha0 : 0 < a0) (ha : ∀ i, 0 < a i)
+    (hle : (1 + √(N : ℝ)) * ∑ i ∈ A, a i ≤ ((N : ℝ) - 1) * a0) :
+    Real.log (1 + √(N : ℝ)) ≤ (∑ i ∈ A, Real.log (a0 / a i)) / ((N : ℝ) - 1) := by
+  have hN1pos : (0 : ℝ) < (N : ℝ) - 1 := by
+    have : (2 : ℝ) ≤ N := by exact_mod_cast hN
+    linarith
+  have hpos : 0 < 1 + √(N : ℝ) := by positivity
+  have hm := mean_log_le (r := fun i => a i / a0) hA (fun i _ => div_pos (ha i) ha0)
+  rw [hcard] at hm
+  have hneg : ∑ i ∈ A, Real.log (a0 / a i) = -∑ i ∈ A, Real.log (a i / a0) := by
+    rw [← Finset.sum_neg_distrib]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [← Real.log_inv, inv_div]
+  have hsum_pos : 0 < ∑ i ∈ A, a i := Finset.sum_pos (fun i _ => ha i) hA
+  have hmean : (∑ i ∈ A, a i / a0) / ((N : ℝ) - 1) ≤ (1 + √(N : ℝ))⁻¹ := by
+    rw [← Finset.sum_div, div_div, inv_eq_one_div, div_le_div_iff₀ (by positivity) hpos]
+    nlinarith [hle]
+  have hlog : Real.log ((∑ i ∈ A, a i / a0) / ((N : ℝ) - 1)) ≤ -Real.log (1 + √(N : ℝ)) := by
+    rw [← Real.log_inv]
+    exact Real.log_le_log (div_pos (by rw [← Finset.sum_div]; exact div_pos hsum_pos ha0) hN1pos) hmean
+  rw [hneg, neg_div]
+  linarith
+
+/-- **The balance along a path**: under the hypotheses of `full_turn_balance`, the *mean* free energy over all nontrivial
+values of one type, `z` or `ε`, is at least `log (1 + √N)`. The maximum over sectors is a rate along a path that turns once
+through the sectors: a path that visits each nontrivial sector once pays at least `log (1 + √N)` per step on average, the base
+point (the shared root) left out. -/
+theorem full_turn_balance_mean {ι κ : Type*} [Fintype ι] [Fintype κ] [DecidableEq ι] [DecidableEq κ] {N : ℕ}
+    (hι : Fintype.card ι = N) (hκ : Fintype.card κ = N) (hN : 2 ≤ N) (o : ι) (o' : κ) (z : ι → ℝ) (ε : κ → ℝ)
+    (hz : ∀ k, 0 < z k) (hε : ∀ e, 0 < ε e) (hsum : ∑ e, ε e = z o) (hbase : (N : ℝ) * ε o' = ∑ k, z k) :
+    Real.log (1 + √(N : ℝ)) ≤ (∑ k ∈ Finset.univ.erase o, Real.log (z o / z k)) / ((N : ℝ) - 1) ∨
+      Real.log (1 + √(N : ℝ)) ≤ (∑ e ∈ Finset.univ.erase o', Real.log (ε o' / ε e)) / ((N : ℝ) - 1) := by
+  set T := (Finset.univ : Finset ι).erase o
+  set U := (Finset.univ : Finset κ).erase o'
+  have hT : T.card = N - 1 := by rw [Finset.card_erase_of_mem (Finset.mem_univ o), Finset.card_univ, hι]
+  have hU : U.card = N - 1 := by rw [Finset.card_erase_of_mem (Finset.mem_univ o'), Finset.card_univ, hκ]
+  have hTne : T.Nonempty := Finset.card_pos.1 (by omega)
+  have hUne : U.Nonempty := Finset.card_pos.1 (by omega)
+  have hN1 : ((N - 1 : ℕ) : ℝ) = (N : ℝ) - 1 := by push_cast [Nat.cast_sub (show 1 ≤ N by omega)]; ring
+  have hz_split : ∑ k, z k = z o + ∑ k ∈ T, z k := (Finset.add_sum_erase _ _ (Finset.mem_univ o)).symm
+  have hε_split : ∑ e, ε e = ε o' + ∑ e ∈ U, ε e := (Finset.add_sum_erase _ _ (Finset.mem_univ o')).symm
+  have hcore := balance_core hN (hz o) (hε o') (hbase.trans hz_split)
+    (show ∑ e ∈ U, ε e = z o - ε o' by linarith)
+  by_cases h1 : ((N : ℝ) - 1) * z o < (1 + √(N : ℝ)) * ∑ k ∈ T, z k
+  · right
+    have h2 : (1 + √(N : ℝ)) * ∑ e ∈ U, ε e ≤ ((N : ℝ) - 1) * ε o' := by
+      by_contra h2
+      push Not at h2
+      exact hcore ⟨h1, h2⟩
+    exact mean_free_energy_ge hN U (ε o') ε hUne (by rw [hU, hN1]) (hε o') hε h2
+  · left
+    push Not at h1
+    exact mean_free_energy_ge hN T (z o) z hTne (by rw [hT, hN1]) (hz o) hz h1
 
 end Arsenal.FullTurn
