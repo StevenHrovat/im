@@ -31,7 +31,13 @@ certified over the whole string (`vxRead_complete`). Hidden by a half-turn of th
 full turn (`vx_rot_complete`, 5 + 21 = 26). When the rotational symmetry is not positive, when the turn on the string does not
 complete and the encoding does not come back, the state is **smelly** (`Smelly`): for rotations below 26, exactly when `k + k'` is not
 a multiple of 26 (`smelly_iff_not_full`). Rotations add (`rot_add`), so a smelly state's residue is what was added beyond the full
-turn: 14 = 13 + 1, twice, leaves a rotation by 2 (`rot14_twice`). Every fact about the string is one kernel evaluation.
+turn: 14 = 13 + 1, twice, leaves a rotation by 2 (`rot14_twice`).
+
+**The leading zero** (the first author's reading: in binary, Moin is the leading zero, rotated away as the certificate of a positive
+interaction). Rotating an `n`-bit word left by one place (`rotl`) is an exact doubling exactly when its leading bit is 0
+(`rotl_of_leading_zero`, `rotl_eq_double_iff`); a leading 1 comes round to the end (`rotl_of_leading_one`). Every byte of the string
+has a leading zero (`vx_leading_zero`), so rotating every byte left doubles it exactly (`vx_rotl`). Every fact about the string is one
+kernel evaluation.
 
 Mathlib alone, nothing open.
 -/
@@ -206,5 +212,58 @@ theorem rot_add : ∀ a < 26, ∀ b < 26, (vx.map (rot a)).map (rot b) = vx.map 
 /-- **The residue of a smelly state is what was added beyond the half-turns**: rotating by 14 = 13 + 1 twice completes the full turn
 and leaves a rotation by 2, the two added steps. -/
 theorem rot14_twice : (vx.map (rot 14)).map (rot 14) = vx.map (rot 2) := by decide
+
+/-! ## The leading zero: rotated away as the certificate of a positive step -/
+
+/-- **Rotating an `n`-bit word left by one place**: every bit moves one place up, and the leading bit comes round to the end. -/
+def rotl (n x : ℕ) : ℕ := (2 * x) % 2 ^ n + x / 2 ^ (n - 1)
+
+/-- **A leading zero is rotated away**: when the leading bit of an `n`-bit word is 0, rotating it left is an exact doubling; nothing
+comes round to the end. -/
+theorem rotl_of_leading_zero {n x : ℕ} (hn : 1 ≤ n) (hx : x < 2 ^ (n - 1)) : rotl n x = 2 * x := by
+  have hp : 2 ^ n = 2 * 2 ^ (n - 1) := by
+    obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
+    rw [Nat.add_sub_cancel, pow_succ']
+  unfold rotl
+  rw [hp]
+  generalize 2 ^ (n - 1) = q at *
+  rw [Nat.mod_eq_of_lt (by omega), Nat.div_eq_of_lt hx, add_zero]
+
+/-- **A leading one comes round**: when the leading bit is 1, rotating left is not a doubling; the bit leaves the top and comes back
+at the end (`rotl n x + 2 ^ n = 2 * x + 1`). -/
+theorem rotl_of_leading_one {n x : ℕ} (hn : 1 ≤ n) (h1 : 2 ^ (n - 1) ≤ x) (h2 : x < 2 ^ n) :
+    rotl n x + 2 ^ n = 2 * x + 1 := by
+  have hp : 2 ^ n = 2 * 2 ^ (n - 1) := by
+    obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
+    rw [Nat.add_sub_cancel, pow_succ']
+  have hq : 0 < 2 ^ (n - 1) := by positivity
+  unfold rotl
+  rw [hp] at h2 ⊢
+  generalize 2 ^ (n - 1) = q at *
+  have hd : x / q = 1 := by
+    apply le_antisymm
+    · exact Nat.lt_succ_iff.mp ((Nat.div_lt_iff_lt_mul hq).2 (by omega))
+    · exact (Nat.le_div_iff_mul_le hq).2 (by omega)
+  rw [Nat.mod_eq_sub_mod (by omega), Nat.mod_eq_of_lt (by omega), hd]
+  omega
+
+/-- **The certificate**: for an `n`-bit word, rotating left is an exact doubling exactly when the leading bit is 0. A step that comes
+out as a doubling certifies that a leading zero was there and was rotated away, and nothing spilled. -/
+theorem rotl_eq_double_iff {n x : ℕ} (hn : 1 ≤ n) (h2 : x < 2 ^ n) : rotl n x = 2 * x ↔ x < 2 ^ (n - 1) := by
+  refine ⟨fun h => ?_, rotl_of_leading_zero hn⟩
+  by_contra h1
+  have h3 := rotl_of_leading_one hn (not_lt.mp h1) h2
+  have hq : 0 < 2 ^ (n - 1) := by positivity
+  omega
+
+/-- **Every byte of `vxunderground` has a leading zero**: each is below `2 ^ 7` (ASCII; one kernel evaluation). -/
+theorem vx_leading_zero : ∀ b ∈ vx, b < 2 ^ 7 := by decide
+
+/-- **Rotating every byte left doubles it exactly**: the 13 leading zeros are rotated away and nothing comes round. -/
+theorem vx_rotl : vx.map (rotl 8) = vx.map (2 * ·) :=
+  List.map_congr_left (fun b hb => rotl_of_leading_zero (by norm_num) (vx_leading_zero b hb))
+
+/-- **A byte with a leading one is not doubled**: the byte 250 rotated left wraps its leading bit (`rotl 8 250 = 245`, not 500). -/
+theorem rotl_250 : rotl 8 250 = 245 := by decide
 
 end Arsenal.Toy
