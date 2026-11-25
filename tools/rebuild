@@ -7,6 +7,9 @@
 #                                          arsenal/lake-manifest.json), recompute each hash, and write the offline supply to <dir>
 #   tools/rebuild supply-verify <dir>      recompute every hash of a supply; exit 1 when anything is missing or differs (a minting
 #                                          refuses to start without a complete, verified supply: DMP 01, G0, mint prep)
+#   tools/rebuild matrix [<repo> ...] [--kernels]
+#                                          the API for a repository that uses IM: IM and each repository named, a k by k table whose
+#                                          cell says whether the row proves the column; exit 0 only when every cell is + (see below)
 #   tools/rebuild check <target> [quick|full] [--supply <dir>] [--from-source]
 #        target   core      IM's finite layer (arsenal/core, no Mathlib)
 #                 arsenal   IM's analytic layer (arsenal/, Mathlib as an API)
@@ -280,9 +283,83 @@ cmd_check() {
   return $fail
 }
 
+# ---- the matrix --------------------------------------------------------------------------------------------------------------------
+# The API another repository uses: k parts (IM and the repositories named), a k by k table in which the cell (row, column) says whether
+# the row proves the column, and the assertion that every cell is +. The first author, 2026-11-25: "gravity can use it as an API,
+# because it just has to assert an array of k by k with + at each cell."
+#   diagonal      the part proves itself: its tools/trust-roundtrip.sh passes (with --kernels, IM also passes tools/rebuild check core)
+#   row holds col the row holds the column (vendor/<name>/PIN names the column's repository) and its round trip proves the held copy
+#                 back and forth
+#   row pins col  a lakefile.toml of the row requires the column's repository and its round trip proves the pinned commit
+#   neither       the cell is "·": no proof relates the two. Whether such a cell may count is the first author's decision; until then
+#                 it does not, and the assertion fails.
+# A cell that has a relation whose proof fails is "-". Exit 0 only when every cell is +.
+origin_of() { git -C "$1" remote get-url origin 2>/dev/null | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
+norm_url() { printf '%s' "$1" | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
+cmd_matrix() {
+  local kernels=0 parts=("$IM") p
+  while [ $# -gt 0 ]; do case "$1" in --kernels) kernels=1;; *) p=$(abs "$1"); [ -d "$p" ] || die "$1: no such folder"; parts+=("$(cd "$p" && pwd)");; esac; shift; done
+  local k=${#parts[@]} i j names=() urls=() outs=() rcs=()
+  for ((i = 0; i < k; i++)); do
+    urls[i]=$(origin_of "${parts[i]}"); [ -n "${urls[i]}" ] || die "${parts[i]}: not a git repository with an origin"
+    names[i]=$(basename "${urls[i]}")
+    [ -f "${parts[i]}/tools/trust-roundtrip.sh" ] || die "${names[i]} has no tools/trust-roundtrip.sh: it cannot prove anything"
+    say "${names[i]}: its round trip"
+    outs[i]=$(bash "${parts[i]}/tools/trust-roundtrip.sh" 2>&1); rcs[i]=$?
+    echo "${outs[i]}" | tail -1
+  done
+  if [ "$kernels" = 1 ]; then say "IM: both kernels on the core"; ( cmd_check core ) || rcs[0]=1; fi
+  local cell why table=() reasons=() all=1
+  for ((i = 0; i < k; i++)); do for ((j = 0; j < k; j++)); do
+    cell="·"; why="no proof relates them"
+    if [ "$i" = "$j" ]; then
+      if [ "${rcs[i]}" = 0 ]; then cell="+"; why="its own round trip passes$([ "$kernels" = 1 ] && [ "$i" = 0 ] && echo ', and both kernels accept its core')"
+      else cell="-"; why="its own check fails"; fi
+    else
+      local pin v held=""
+      for pin in "${parts[i]}"/vendor/*/PIN; do
+        [ -f "$pin" ] || continue
+        if [ "$(norm_url "$(awk -F'\t' '$1=="source"{print $2}' "$pin")")" = "${urls[j]}" ]; then held=$(basename "$(dirname "$pin")"); fi
+      done
+      if [ -n "$held" ]; then
+        v=$(awk -F'\t' '$1=="commit"{print $2}' "${parts[i]}/vendor/$held/PIN" | tr -d '\r')
+        if echo "${outs[i]}" | grep -q "^ok   vendor/$held back:" && echo "${outs[i]}" | grep -q "^ok   vendor/$held forth:"; then
+          cell="+"; why="holds vendor/$held at ${v:0:12}, proven back and forth"
+        else cell="-"; why="holds vendor/$held, but its proof fails"; fi
+      else
+        local lf req=""
+        while IFS= read -r lf; do
+          req=$(awk -v u="${urls[j]}" '
+            /^\[\[/ { if (r && n != "" && g == u) print n; r = ($0 ~ /^\[\[require\]\]/); n = ""; g = ""; next }
+            r && /^name = / { v = $0; sub(/^name = "/, "", v); sub(/".*/, "", v); n = v }
+            r && /^git = /  { v = $0; sub(/^git = "/, "", v);  sub(/".*/, "", v); sub(/\.git$/, "", v); sub(/\/$/, "", v); g = v }
+            END { if (r && n != "" && g == u) print n }' "${parts[i]}/$lf" | head -1)
+          [ -n "$req" ] && break
+        done < <(git -C "${parts[i]}" ls-files '*lakefile.toml' | grep -v '^vendor/')
+        if [ -n "$req" ]; then
+          v=$(echo "${outs[i]}" | grep -E "^ok   $lf $req: commit [0-9a-f]+ fetched by its id" | head -1 | sed -E 's/.*commit ([0-9a-f]+).*/\1/')
+          if [ -n "$v" ]; then cell="+"; why="pins it ($lf, $req) at $v, the commit fetched by its id and the id recomputed"
+          else cell="-"; why="pins it ($lf, $req), but the pin is not proven"; fi
+        fi
+      fi
+    fi
+    table[i*k+j]=$cell; reasons+=("${names[i]} -> ${names[j]}: $cell  $why"); [ "$cell" = "+" ] || all=0
+  done; done
+  say "the matrix: the row proves the column"
+  local w=12 line
+  line=$(printf "%-${w}s" ""); for ((j = 0; j < k; j++)); do line+=$(printf "%-${w}s" "${names[j]}"); done; echo "$line"
+  for ((i = 0; i < k; i++)); do
+    line=$(printf "%-${w}s" "${names[i]}"); for ((j = 0; j < k; j++)); do line+=$(printf "%-${w}s" "${table[i*k+j]}"); done; echo "$line"
+  done
+  printf '%s\n' "${reasons[@]}"
+  if [ "$all" = 1 ]; then echo "matrix: OK, $k by $k, every cell +"; return 0; fi
+  echo "matrix: FAILED, not every cell is + ('-' a proof fails, '·' no proof relates the two)"; return 1
+}
+
 case "${1:-}" in
+  matrix) shift; cmd_matrix "$@";;
   supply) shift; cmd_supply "$@";;
   supply-verify) shift; cmd_supply_verify "$@";;
   check) shift; cmd_check "$@";;
-  *) sed -n 2,26p "$0"; exit 2;;
+  *) sed -n 2,29p "$0"; exit 2;;
 esac
