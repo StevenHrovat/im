@@ -155,7 +155,7 @@ setup_checkers() {
 
 # ---- the target --------------------------------------------------------------------------------------------------------------------
 libs_of() { awk '/^\[\[lean_lib\]\]/{l=1;next} /^\[/{l=0} l&&/^name = /{v=$0; sub(/^name = "/,"",v); sub(/".*/,"",v); print v}' "$1/lakefile.toml"; }
-modules_of() { ( cd "$1"; for l in $(libs_of "$1"); do find "$l" -name '*.lean' 2>/dev/null | sed 's/\.lean$//; s#/#.#g'; [ -f "$l.lean" ] && echo "$l"; done ) | sort -u; }
+modules_of() { ( cd "$1"; for l in $(libs_of "$1"); do find "$l" -name '*.lean' 2>/dev/null | sed 's/\.lean$//; s#/#.#g'; if [ -f "$l.lean" ]; then echo "$l"; fi; done ) | sort -u; }
 # A module name is a prefix for the checkers (a library root would replay every submodule at once), so a root that only imports is left
 # out; a root with declarations of its own is checked like any module.
 has_decls() { grep -qE '^\s*(theorem|lemma|def|instance|structure|class|inductive|abbrev|axiom|opaque|example)\b' "$1"; }
@@ -188,7 +188,8 @@ prepare() {   # target -> sets P (the project folder)
   # shellcheck disable=SC2046
   ( cd "$P" && lake build $(modules_of "$P") > "$LOG/build.log" 2>&1 ) || die "the build failed ($LOG/build.log)"
   ( cd "$P" && modules_of "$P" | sed 's/^/import /' > CheckAll.lean && mkdir -p .lake/build/lib/lean \
-    && lake env lean -o .lake/build/lib/lean/CheckAll.olean CheckAll.lean ) || die "the root of all modules did not build"
+    && lake env lean -o .lake/build/lib/lean/CheckAll.olean CheckAll.lean ) > "$LOG/checkall.log" 2>&1 \
+    || { tail -5 "$LOG/checkall.log"; die "the root of all modules did not build ($LOG/checkall.log)"; }
 }
 
 # ---- the two kernels ---------------------------------------------------------------------------------------------------------------
