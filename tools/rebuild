@@ -303,10 +303,13 @@ cmd_matrix() {
   for ((i = 0; i < k; i++)); do
     urls[i]=$(origin_of "${parts[i]}"); [ -n "${urls[i]}" ] || die "${parts[i]}: not a git repository with an origin"
     names[i]=$(basename "${urls[i]}")
-    [ -f "${parts[i]}/tools/trust-roundtrip.sh" ] || die "${names[i]} has no tools/trust-roundtrip.sh: it cannot prove anything"
     say "${names[i]}: its round trip"
-    outs[i]=$(bash "${parts[i]}/tools/trust-roundtrip.sh" 2>&1); rcs[i]=$?
-    echo "${outs[i]}" | tail -1
+    if [ -f "${parts[i]}/tools/trust-roundtrip.sh" ]; then
+      outs[i]=$(bash "${parts[i]}/tools/trust-roundtrip.sh" 2>&1); rcs[i]=$?
+      echo "${outs[i]}" | tail -1
+    else   # a part without a round trip proves nothing: its diagonal and its rows cannot be +
+      outs[i]=""; rcs[i]=2; echo "${names[i]} has no tools/trust-roundtrip.sh: it proves nothing"
+    fi
   done
   if [ "$kernels" = 1 ]; then say "IM: both kernels on the core"; ( cmd_check core ) || rcs[0]=1; fi
   local cell why table=() reasons=() all=1
@@ -314,6 +317,7 @@ cmd_matrix() {
     cell="·"; why="no proof relates them"
     if [ "$i" = "$j" ]; then
       if [ "${rcs[i]}" = 0 ]; then cell="+"; why="its own round trip passes$([ "$kernels" = 1 ] && [ "$i" = 0 ] && echo ', and both kernels accept its core')"
+      elif [ "${rcs[i]}" = 2 ]; then cell="-"; why="it has no round trip, so it proves nothing, itself included"
       else cell="-"; why="its own check fails"; fi
     else
       local pin v held=""
