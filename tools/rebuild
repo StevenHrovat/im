@@ -350,10 +350,10 @@ cmd_matrix() {
     table[i*k+j]=$cell; reasons+=("${names[i]} -> ${names[j]}: $cell  $why"); [ "$cell" = "+" ] || all=0
   done; done
   say "the matrix: the row proves the column"
-  local w=12 line
+  local w=12 line c
   line=$(printf "%-${w}s" ""); for ((j = 0; j < k; j++)); do line+=$(printf "%-${w}s" "${names[j]}"); done; echo "$line"
   for ((i = 0; i < k; i++)); do
-    line=$(printf "%-${w}s" "${names[i]}"); for ((j = 0; j < k; j++)); do line+=$(printf "%-${w}s" "${table[i*k+j]}"); done; echo "$line"
+    line=$(printf "%-${w}s" "${names[i]}"); for ((j = 0; j < k; j++)); do c=${table[i*k+j]}; line+="$c$(printf "%$((w - 1))s" "")"; done; echo "$line"   # every cell is one character wide
   done
   printf '%s\n' "${reasons[@]}"
   if [ "$all" = 1 ]; then echo "matrix: OK, $k by $k, every cell +"; return 0; fi
