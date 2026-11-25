@@ -11,3 +11,4 @@ import Arsenal.GRH
 import Arsenal.FullTurn
 import Arsenal.Observable
 import Arsenal.Toy
+import Arsenal.Decode
