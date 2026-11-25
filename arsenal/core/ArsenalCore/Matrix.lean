@@ -11,17 +11,21 @@ and only the first `k` count, so a table for `k` parts is also one for `k + 1`: 
 already stated about the first `k` changes.
 
 * **Every cell `+`** (`AllPlus`). **Extensibility** (`allPlus_succ_iff`): `k + 1` parts are all `+` exactly when the first `k` are
-  and the new part's row, column and own cell are; that is `2k + 1` new cells (`new_cells`), and nothing proven is checked again.
+  and the new part's row, column and own cell are, so nothing proven is checked again; the count of new cells, `2k + 1`, is
+  arithmetic (`new_cells`).
 * **Derivation** (`comp`, `step`, `derive`): the row proves a part that proves the column. A derived cell always has its chain
-  (`chain_of_comp`, `step_sound`), and every chain gives a derived cell (`comp_of_chain`): derivation explains, it adds no proof of
-  its own. On an all-`+` table it changes nothing (`step_eq_of_allPlus`).
+  (`chain_of_comp`, `step_sound`), after any number of steps (`derive_sound`: every derived cell is reached by a chain of cells of
+  the table), and every chain gives a derived cell (`comp_of_chain`). On an all-`+` table a step adds nothing (`step_eq_of_allPlus`).
+  That a derived cell is an explanation and not a proof is the first author's reading, not a theorem here: a derived cell is a `true`
+  like any other.
 * **The `·` cells** (`Eff`, `allPlus_eff_iff`): where the row does not use the column the cell reflects positively; where it does,
   the proof must be there. Every cell of the effective table is `+` exactly when every used cell is proven.
 * **The `.` boundary is a DAG** (`Earlier`, `derive_irrefl`): when every use points to an earlier part, no chain of uses returns to
   where it started, at any length.
 * **The parts measured on 2026-11-25** (`versionUses`, `repoUses`): by version, the uses of DMP, Gravity and IM form a DAG
   (`versions_dag`) and every use is proven (`versions_explained`); collapsed to repositories, IM and Gravity use each other
-  (`repos_cycle`, `repos_not_dag`). A cycle of repositories is a DAG of versions: the two never exist at the same time. DMP uses
+  (`repos_cycle`, `repos_not_dag`). A cycle of repositories is a DAG of versions; that the two never exist at the same time is
+  the first author's reading. DMP uses
   nothing and is included by every other part (`dmp_only_included`).
 * **The drafts, a library transitive to G0** (`draftUses`): each draft grows from the one before, so the drafts form a DAG however
   many there are (`drafts_dag`, `drafts_no_return`), Draft 6 reaches Draft 4 through Draft 5 (`draft6_reaches_g0`), and in a library
@@ -113,12 +117,26 @@ theorem step_sound {k : Nat} {A : Table} {i j : Nat} (h : step k A i j = true) :
   · exact Or.inl h
   · exact Or.inr (chain_of_comp h)
 
-/-- **On an all-`+` table derivation changes nothing**: it explains, it does not prove. -/
+/-- **On an all-`+` table a step adds nothing.** (That a derived cell explains and does not prove is the first author's reading.) -/
 theorem step_eq_of_allPlus {k : Nat} {A : Table} (h : AllPlus k A) :
     ∀ i, i < k → ∀ j, j < k → step k A i j = A i j := by
   intro i hi j hj
   rw [h i hi j hj]
   exact le_step (h i hi j hj)
+
+/-- **A chain of cells**: the row reaches the column through parts below `k`, each link a cell of the table. -/
+inductive Reach (k : Nat) (A : Table) : Nat → Nat → Prop
+  | edge {i j : Nat} : A i j = true → Reach k A i j
+  | trans {i l j : Nat} : l < k → Reach k A i l → Reach k A l j → Reach k A i j
+
+/-- **Every derived cell is reached by a chain**, after any number of steps: derivation adds a cell only along chains of cells
+already in the table. -/
+theorem derive_sound {k : Nat} {A : Table} : ∀ n i j, derive k A n i j = true → Reach k A i j
+  | 0, _, _, h => Reach.edge h
+  | n + 1, i, j, h => by
+    rcases step_sound h with h1 | ⟨l, hl, h1, h2⟩
+    · exact derive_sound n i j h1
+    · exact Reach.trans hl (derive_sound n i l h1) (derive_sound n l j h2)
 
 /-! ## The `·` cells and the `.` boundary -/
 
@@ -210,7 +228,8 @@ def repoUses : Table := fun i j =>
 /-- **Collapsed to repositories, IM and Gravity use each other.** -/
 theorem repos_cycle : repoUses 1 2 = true ∧ repoUses 2 1 = true := by decide
 
-/-- **So the repositories are not a DAG**; the versions are (`versions_dag`): the two never exist at the same time. -/
+/-- **So the repositories are not a DAG**; the versions are (`versions_dag`). The first author reads this as the two never existing
+at the same time. -/
 theorem repos_not_dag : ¬ Earlier 3 repoUses := by decide
 
 /-- **DMP states only inclusion**: by repository, DMP uses nothing (its row is empty) and every other part includes it. -/
