@@ -11,6 +11,7 @@
 # First a canary: the full turn on vxunderground must return it, or the state is smelly and nothing is trusted.
 # What it proves, found by itself so that a new pin is covered by construction:
 #   vendor/*/PIN                  the sha256 of the held copy (back), and the pinned commit rebuilt into the same copy, byte for byte (forth)
+#                                 (also a held copy's own held copies, vendor/*/vendor/*/PIN)
 #   externals/EXTERNALS (git)     every commit id (fetched by its id, the id recomputed from its content)
 #   lakefile.toml requires        a tag must resolve to the commit the lake manifest next to it records
 #   lake-manifest.json packages   every package's commit id (Mathlib and everything it needs)
@@ -74,7 +75,9 @@ else
 fi
 
 # 1. Held copies: the content's sha256 (back), then the pinned commit rebuilt into the same copy (forth).
-for folder in vendor/*/; do
+# Nested held copies (a held repository holds its own copies) are proven the same way: vendor/<name>/vendor/<name>/.
+for folder in vendor/*/ vendor/*/vendor/*/; do
+  [ -d "$folder" ] || continue
   folder="${folder%/}"; pin="$folder/PIN"
   [ -f "$pin" ] || { bad "$folder has no PIN"; continue; }
   src=$(awk -F'\t' '$1=="source"{print $2}' "$pin"); commit=$(awk -F'\t' '$1=="commit"{print $2}' "$pin")

@@ -291,8 +291,12 @@ cmd_check() {
 #   row holds col the row holds the column (vendor/<name>/PIN names the column's repository) and its round trip proves the held copy
 #                 back and forth
 #   row pins col  a lakefile.toml of the row requires the column's repository and its round trip proves the pinned commit
-#   neither       the cell is "·": no proof relates the two. Whether such a cell may count is the first author's decision; until then
-#                 it does not, and the assertion fails.
+#   neither       the cell is "·": no proof relates the two, and it reflects positively. The first author, 2026-11-25: "since no proof
+#                 relates them, they either do not exist at the same time, or both exist and reflect positively, so the . inclusion
+#                 boundary of a DAG fits perfectly." So a cell must be + exactly where the row uses the column; arsenal/core
+#                 ArsenalCore/Matrix.lean proves that this is the effective table being all + (allPlus_eff_iff).
+#   derived       a "·" cell that a chain of uses reaches (the row uses a part that uses the column) is listed with its chain; a chain
+#                 that returns to its start is a cycle of repositories, which the pinned commits order as a DAG of versions.
 # A cell that has a relation whose proof fails is "-". Exit 0 only when every cell is +.
 origin_of() { git -C "$1" remote get-url origin 2>/dev/null | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
 norm_url() { printf '%s' "$1" | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
@@ -312,7 +316,7 @@ cmd_matrix() {
     fi
   done
   if [ "$kernels" = 1 ]; then say "IM: both kernels on the core"; ( cmd_check core ) || rcs[0]=1; fi
-  local cell why table=() reasons=() all=1
+  local cell why table=() reasons=() all=1 uses=() l
   for ((i = 0; i < k; i++)); do for ((j = 0; j < k; j++)); do
     cell="·"; why="no proof relates them"
     if [ "$i" = "$j" ]; then
@@ -347,7 +351,8 @@ cmd_matrix() {
         fi
       fi
     fi
-    table[i*k+j]=$cell; reasons+=("${names[i]} -> ${names[j]}: $cell  $why"); [ "$cell" = "+" ] || all=0
+    table[i*k+j]=$cell; reasons+=("${names[i]} -> ${names[j]}: $cell  $why"); [ "$cell" = "-" ] && all=0
+    if [ "$i" != "$j" ] && [ "$cell" != "·" ]; then uses[i*k+j]=1; else uses[i*k+j]=0; fi
   done; done
   say "the matrix: the row proves the column"
   local w=12 line c
@@ -356,8 +361,16 @@ cmd_matrix() {
     line=$(printf "%-${w}s" "${names[i]}"); for ((j = 0; j < k; j++)); do c=${table[i*k+j]}; line+="$c$(printf "%$((w - 1))s" "")"; done; echo "$line"   # every cell is one character wide
   done
   printf '%s\n' "${reasons[@]}"
-  if [ "$all" = 1 ]; then echo "matrix: OK, $k by $k, every cell +"; return 0; fi
-  echo "matrix: FAILED, not every cell is + ('-' a proof fails, '·' no proof relates the two)"; return 1
+  # derivations: one chain through a third part
+  for ((i = 0; i < k; i++)); do for ((j = 0; j < k; j++)); do
+    for ((l = 0; l < k; l++)); do
+      [ "$l" != "$i" ] && [ "$l" != "$j" ] && [ "${uses[i*k+l]}" = 1 ] && [ "${uses[l*k+j]}" = 1 ] || continue
+      if [ "$i" = "$j" ]; then echo "cycle: ${names[i]} -> ${names[l]} -> ${names[i]}, by repository; by version the pinned commits above order it as a DAG"
+      elif [ "${uses[i*k+j]}" = 0 ]; then echo "derived: ${names[i]} -> ${names[j]} through ${names[l]}"; fi
+    done
+  done; done
+  if [ "$all" = 1 ]; then echo "matrix: OK, $k by $k, every cell + where the row uses the column, every other cell reflects positively (·)"; return 0; fi
+  echo "matrix: FAILED, a cell is - (a part's own check, or the proof of a use, fails)"; return 1
 }
 
 case "${1:-}" in
