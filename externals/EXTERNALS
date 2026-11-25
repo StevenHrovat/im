@@ -1,0 +1,13 @@
+# The Externals IM contains: a pinned link to each, never its content (DMP 00-preamble: packages, toolchains and images join only at
+# mint prep, so the root repositories stay lean). Their supply is needed for any valid minting (DMP 01, G0, mint prep): every one is
+# stored and verified against its pin by `tools/rebuild supply`, and the White Key Holders carry that supply.
+#
+# One row per External, tab-separated: name, kind, source, pin, what it is for.
+#   kind git      pin is a commit id; tools/trust-roundtrip.sh fetches it by its id and recomputes the id from its content
+#   kind archive  pin is the sha256 of the download; tools/rebuild supply downloads it and recomputes the hash
+# Mathlib and the packages it needs are Externals too: arsenal/lake-manifest.json pins each by its commit id, and the round trip
+# proves every one (the tag in arsenal/lakefile.toml must resolve to the commit the manifest records).
+lean	archive	https://github.com/leanprover/lean4/releases/download/v4.34.0/lean-4.34.0-linux.tar.zst	caaa98356098c85dc0fcbbd28e1ec66f39eb6551829972b752ff20e1286b646b	the language and the first kernel (Lean's own, with leanchecker), Linux x64; the same row as vendor/dmp/SETUP.md
+lean4export	git	https://github.com/leanprover/lean4export	076e8e57707e813375e8f9da8bf989799ace9680	writes the checked terms out for the second kernel (tag v4.34.0)
+nanoda	git	https://github.com/ammkrn/nanoda_lib	0da9f98feadd3a0a2ef4b3dbcf52a298a6fef929	the second kernel, written separately, in Rust
+lean4lean	git	https://github.com/digama0/lean4lean	0048ed71e784ecb5344de3c056cc415e8564f016	an optional third kernel: Lean's kernel written in Lean

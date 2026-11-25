@@ -46,10 +46,35 @@ imported from here only. Its gate is a lint: a change contains nothing that cann
 statement left open is answered R136a1 (a named hypothesis), never `sorry`. First piece: the Mathlib-only core of Birch and
 Swinnerton-Dyer.
 
+## Two kernels, the Externals and the supply
+
+IM contains two kernels in the sense of G0: not their content, a pinned link to each, whose supply every valid minting needs (the first
+author, 2026-11-25; DMP 01, mint prep: preparing a minting stores every dependency and verifies each against its pin, and the White Key
+Holders carry it). The root repository stays lean (DMP 00: toolchains join only at mint prep).
+
+- **The Externals** ([externals/EXTERNALS](externals/EXTERNALS)): the Lean toolchain (the language and the first kernel, Lean's own,
+  with `leanchecker`), lean4export, nanoda (the second kernel, written separately, in Rust) and lean4lean (an optional third), each by
+  its commit or its sha256; Mathlib and every package it needs are pinned by commit in `arsenal/lake-manifest.json`.
+- **Proven before used**: `tools/trust-roundtrip.sh` fetches every pinned commit by its id and recomputes the id from its content, and
+  rebuilds each held copy (`vendor/`) byte for byte, before every commit and push (`.githooks`; once per clone:
+  `git config core.hooksPath .githooks`) and in `tools/verify`. Gravity pins IM by construction, so what Gravity uses of IM is a
+  proven IM.
+- **The supply** (mint prep): `tools/rebuild supply <dir>` fetches every External by its pin, recomputes each hash and writes the
+  offline supply; `tools/rebuild supply-verify <dir>` refuses a supply in which anything is missing or differs.
+- **The check**: `tools/rebuild check <core|arsenal|path> [quick|full] [--supply <dir>]`. Lean's kernel replays the declarations
+  (`leanchecker`, `--fresh` from nothing in full mode) and nanoda checks the exported terms; a declaration counts only when both accept
+  it, on the standard axioms only. Quick mode checks the target's own modules with the first kernel and, with the second, the target
+  together with everything it uses, Mathlib and Lean core included. Full mode checks the whole closure with both (hours, about 16 GB of
+  RAM for Mathlib) and writes a stamp. With `--supply` everything comes from the supply, offline, and Mathlib is built from its source;
+  without it Mathlib's prebuilt files are fetched, and only the kernels' re-check makes them trusted. `<path>` is any Lake project
+  that pins IM, for example a Gravity build folder of the paper's Lean. `tools/verify` runs `tools/rebuild check core` on every
+  change.
+
 ## Build and test
 
 ```
-tools/verify             # the one gate: pins, the setup file, the scrub scan, build, tests, the proof; exit 0 or 1
+tools/verify             # the one gate: pins, trusted hashes, the setup file, the scrub scan, build, tests, the proof, two kernels; exit 0 or 1
+tools/rebuild check core # IM's finite layer through both kernels (seconds once the checkers are built)
 dotnet build Im.slnx
 dotnet test Im.slnx
 proof/tools/check.sh     # the proof alone (lean and lake on the PATH: tools/lean-install.sh)
