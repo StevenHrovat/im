@@ -174,7 +174,9 @@ public static class ImFrames
 /// <summary>
 /// The state of one IM channel, seen from the client. <see cref="Moin"/> is the establishment label (the owner's word, his universal
 /// greeting, chosen because it carries no meaning IM already uses): the request is proper, the gate has recognised it, and its
-/// satisfaction is open. The challenge, the door and the response all happen inside Moin; satisfaction ends it.
+/// satisfaction is open. The challenge, the door and the response all happen inside Moin; satisfaction ends it. A refusal is not a
+/// state: the gate's refused answer, a failed door or a closed connection end the exchange with an <see cref="ImClientException"/>,
+/// and the client drops the session while it is in Moin. The gate keeps no such state variable; it is the client's view.
 /// </summary>
 public enum ImChannelState
 {

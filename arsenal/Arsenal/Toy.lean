@@ -36,8 +36,9 @@ turn: 14 = 13 + 1, twice, leaves a rotation by 2 (`rot14_twice`).
 **The leading zero** (the first author's reading: in binary, Moin is the leading zero, rotated away as the certificate of a positive
 interaction). Rotating an `n`-bit word left by one place (`rotl`) is an exact doubling exactly when its leading bit is 0
 (`rotl_of_leading_zero`, `rotl_eq_double_iff`); a leading 1 comes round to the end (`rotl_of_leading_one`). Every byte of the string
-has a leading zero (`vx_leading_zero`), so rotating every byte left doubles it exactly (`vx_rotl`). Every fact about the string is one
-kernel evaluation.
+has a leading zero (`vx_leading_zero`), so rotating every byte left doubles it exactly (`vx_rotl`, from `rotl_of_leading_zero`).
+A rotation never loses a bit: the doubling certifies that no bit wrapped round. Every other fact about the string is one kernel
+evaluation; the finite layer is also in `arsenal/core`, on the kernel alone.
 
 Mathlib alone, nothing open.
 -/
@@ -248,7 +249,8 @@ theorem rotl_of_leading_one {n x : ℕ} (hn : 1 ≤ n) (h1 : 2 ^ (n - 1) ≤ x) 
   omega
 
 /-- **The certificate**: for an `n`-bit word, rotating left is an exact doubling exactly when the leading bit is 0. A step that comes
-out as a doubling certifies that a leading zero was there and was rotated away, and nothing spilled. -/
+out as a doubling certifies that a leading zero was there and was rotated away: no bit wrapped round (a rotation itself never loses
+a bit). -/
 theorem rotl_eq_double_iff {n x : ℕ} (hn : 1 ≤ n) (h2 : x < 2 ^ n) : rotl n x = 2 * x ↔ x < 2 ^ (n - 1) := by
   refine ⟨fun h => ?_, rotl_of_leading_zero hn⟩
   by_contra h1

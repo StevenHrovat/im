@@ -87,7 +87,9 @@ against the shared secret, a fresh nonce; DMP chapter 04, "The handshake"). Befo
 gate answers, with accept or refused. The state in which a request is proper and its **satisfaction is open** is labelled **Moin** (the
 owner, 2026-11-25: his universal greeting, chosen because it carries no meaning IM already uses, so it is unique as a label). Moin lasts
 from the moment the request is recognised as proper until it is satisfied: the challenge, the enrolment door and the response all happen
-inside it, and the established frame ends it.
+inside it, and the established frame ends it. A refusal is not a state: a refused answer, a failed door or a closed connection end the
+exchange with an error, and the client drops the session while it is in Moin. The states are the client's view; the gate keeps no
+such variable.
 
 | State | Seen from the client (`ImClientSession.State`) | The gate |
 |---|---|---|

@@ -6,20 +6,24 @@ Released under the Apache License 2.0.
 /-!
 # The verify toy's finite layer, without Mathlib
 
-Every statement here is about finitely many bits, so Lean's kernel decides it by evaluation: nothing is imported, not even Mathlib,
-and the package has no requirement. What is trusted is the kernel and the axioms it reports, nothing else. The general facts about
-words of every length are proved from Lean's core lemmas on natural numbers.
+Nothing is imported, not even Mathlib, and the package has no requirement. The facts about bytes and the string are decided by the
+kernel's evaluation; the general facts about words of every length are proved from Lean's core lemmas on natural numbers. What is
+trusted is the kernel, with its built-in arithmetic on natural numbers, Lean's prelude definitions and the axioms the report lists.
+A definition is the specification here too: `rotl` is a rotation for words below `2 ^ n`, and `Smelly` is about the one string.
 
-Mathlib is not trusted by the arsenal either: every Mathlib proof is checked again by the same kernel (the de Bruijn criterion). What
-the arsenal takes from Mathlib is its definitions (the complex numbers, the circle, the integral), which state what infinite objects
-mean; no evaluation can establish those, so the analytic layer (`Arsenal`, one directory up) imports Mathlib as an API, and this layer
-does not need to.
+Lean need not trust a library: every Mathlib proof is a term that a small kernel can check again (the de Bruijn
+criterion). Mathlib's own build does; prebuilt files fetched by `lake exe cache get` are loaded without a new check, and a
+replay (Lean's `lean4checker`, or a second kernel such as nanoda over `lean4export`) repeats the check locally. What is trusted
+is the kernel, with its built-in arithmetic on natural numbers, Lean's prelude definitions and the axioms the report lists. What the arsenal takes from Mathlib is its definitions (the complex numbers, the circle, the integral), which state
+what infinite objects mean; no evaluation can establish those, so the analytic layer (`Arsenal`, one directory up) imports Mathlib as
+an API, and this layer does not need to.
 
 **The string** `vxunderground` (`vx`), its bytes. **Smelly**: rotating the letters by `k` and then `k'` does not return the string,
 exactly when `k + k'` is not a multiple of 26 (`smelly_iff_not_full`). **Moin, the leading zero**: rotating an `n`-bit word left is an
 exact doubling exactly when its leading bit is 0 (`rotl_eq_double_iff`), decided on every byte (`moin_byte`); every byte of the
 string has one (`vx_rotl`). **Moin is not the opposite of smelly**: a bit rotation is never smelly, since rotating back returns every
-byte, leading one or not (`rotl_never_smelly`); Moin asks whether a step lost nothing, smelly whether the round trip came back.
+byte, leading one or not (`rotl_never_smelly`). A rotation never loses a bit; Moin asks whether it acted as a doubling (no bit
+wrapped round), smelly whether the round trip came back.
 -/
 
 namespace ArsenalCore.Toy
