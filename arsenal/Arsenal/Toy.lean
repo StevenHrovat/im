@@ -28,7 +28,10 @@ the parts reassembled as the API guides.
 the characters of the string (`vx_eq`) and their bits are listed (`vx_binary`). Read tick by tick, every byte is a lowercase letter,
 certified over the whole string (`vxRead_complete`). Hidden by a half-turn of the 26 letters (rotation by 13) it reads `ikhaqretebhaq`
 (`vx_rot13`); the second half-turn completes the full turn and returns it (`vx_rot13_twice`), and so does any rotation completed to a
-full turn (`vx_rot_complete`, 5 + 21 = 26). Every fact about the string is one kernel evaluation.
+full turn (`vx_rot_complete`, 5 + 21 = 26). When the rotational symmetry is not positive, when the turn on the string does not
+complete and the encoding does not come back, the state is **smelly** (`Smelly`): for rotations below 26, exactly when `k + k'` is not
+a multiple of 26 (`smelly_iff_not_full`). Rotations add (`rot_add`), so a smelly state's residue is what was added beyond the full
+turn: 14 = 13 + 1, twice, leaves a rotation by 2 (`rot14_twice`). Every fact about the string is one kernel evaluation.
 
 Mathlib alone, nothing open.
 -/
@@ -175,5 +178,33 @@ theorem vx_rot13_twice : (vx.map (rot 13)).map (rot 13) = vx := by decide
 
 /-- **A known rotation is undone by completing the turn**: rotating by 5 and then by 21 (5 + 21 = 26) returns the string. -/
 theorem vx_rot_complete : (vx.map (rot 5)).map (rot 21) = vx := by decide
+
+/-! ## Smelly: when the rotational symmetry is not positive -/
+
+/-- **Smelly** (the first author's word): rotating the string by `k` and then by `k'` does not return it. The rotational symmetry is
+not positive: the turn was not completed, and the encoding does not come back. -/
+def Smelly (k k' : ℕ) : Prop := (vx.map (rot k)).map (rot k') ≠ vx
+
+instance (k k' : ℕ) : Decidable (Smelly k k') := by
+  unfold Smelly
+  infer_instance
+
+/-- **Smelly exactly when the turn is not full**: for rotations below 26, the state is smelly exactly when `k + k'` is not a
+multiple of 26 (all 676 pairs, one kernel evaluation). -/
+theorem smelly_iff_not_full : ∀ k < 26, ∀ k' < 26, (Smelly k k' ↔ (k + k') % 26 ≠ 0) := by decide +kernel
+
+/-- **Two half-turns are not smelly**: rotating by 13 twice returns the string. -/
+theorem not_smelly_rot13 : ¬ Smelly 13 13 := by decide
+
+/-- **A turn left incomplete is smelly**: rotating by 1 twice does not return the string. -/
+theorem smelly_one_one : Smelly 1 1 := by decide
+
+/-- **Rotations add** (`y^a y^b = y^(a+b)`): rotating the string by `a` and then by `b` is rotating it by `a + b` modulo 26, for all
+676 pairs below 26 (one kernel evaluation). Written as powers of one turn the rotations multiply; written as steps they add. -/
+theorem rot_add : ∀ a < 26, ∀ b < 26, (vx.map (rot a)).map (rot b) = vx.map (rot ((a + b) % 26)) := by decide +kernel
+
+/-- **The residue of a smelly state is what was added beyond the half-turns**: rotating by 14 = 13 + 1 twice completes the full turn
+and leaves a rotation by 2, the two added steps. -/
+theorem rot14_twice : (vx.map (rot 14)).map (rot 14) = vx.map (rot 2) := by decide
 
 end Arsenal.Toy
