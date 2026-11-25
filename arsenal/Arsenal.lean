@@ -9,3 +9,4 @@ import Arsenal.Rotation
 import Arsenal.Rigidity
 import Arsenal.GRH
 import Arsenal.FullTurn
+import Arsenal.Observable

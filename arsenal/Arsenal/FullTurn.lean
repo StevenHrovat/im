@@ -133,6 +133,18 @@ theorem full_turn_factorial (n : ℕ) {R : ℝ} (hR : 0 < R) :
   simp only [sub_zero, one_div, smul_eq_mul, hd, mul_one] at h
   exact h
 
+/-- **A slope is a ratio of two turns**: the `n`-th derivative at `c` of a function holomorphic on the disc is one turn of
+`f / (z - c) ^ (n + 1)` around `c` divided by one turn of `exp z / z ^ (n + 1)` around `0` (the factorial's turn). -/
+theorem full_turn_slope {f : ℂ → ℂ} {c : ℂ} {R R' : ℝ} (hR : 0 < R) (hR' : 0 < R') (n : ℕ)
+    (hc : ContinuousOn f (Metric.closedBall c R)) (hd : ∀ z ∈ Metric.ball c R, DifferentiableAt ℂ f z) :
+    iteratedDeriv n f c = ((2 * Real.pi * I)⁻¹ * ∮ z in C(c, R), (1 / (z - c) ^ (n + 1)) * f z) /
+      ((2 * Real.pi * I)⁻¹ * ∮ z in C(0, R'), (z ^ (n + 1))⁻¹ * exp z) := by
+  have h1 := full_turn_circle hR n hc hd
+  simp only [smul_eq_mul] at h1
+  rw [h1, full_turn_factorial n hR']
+  have hf : (n.factorial : ℂ) ≠ 0 := by exact_mod_cast n.factorial_ne_zero
+  field_simp
+
 /-- **The leading coefficient is one turn**: if `Λ = (s - c) ^ r g` on the circle and `g` is holomorphic on the disc, one turn of
 `Λ / (s - c) ^ (r + 1)` around `c` gives `g c`, the leading coefficient of `Λ` at `c` (for an L-function at `s = 1` with
 `r` the order of the zero: the BSD leading coefficient, with the `r!` of `Λ^(r)(1) / r!` taken up by the turn). -/
