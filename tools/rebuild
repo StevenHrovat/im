@@ -1,0 +1,287 @@
+#!/usr/bin/env bash
+# tools/rebuild - rebuild from primitives and check with two kernels: Lean's own (leanchecker replays the declarations) and nanoda,
+# written separately in Rust, over the terms lean4export writes out. A declaration counts only when both accept it and it rests on
+# no axiom beyond propext, Quot.sound and Classical.choice. Linux, macOS or WSL; bash, git, curl, jq, zstd, a C compiler, cargo.
+#
+#   tools/rebuild supply <dir>             mint prep: fetch every External by its pin (externals/EXTERNALS, and every package of
+#                                          arsenal/lake-manifest.json), recompute each hash, and write the offline supply to <dir>
+#   tools/rebuild supply-verify <dir>      recompute every hash of a supply; exit 1 when anything is missing or differs (a minting
+#                                          refuses to start without a complete, verified supply: DMP 01, G0, mint prep)
+#   tools/rebuild check <target> [quick|full] [--supply <dir>] [--from-source]
+#        target   core      IM's finite layer (arsenal/core, no Mathlib)
+#                 arsenal   IM's analytic layer (arsenal/, Mathlib as an API)
+#                 <path>    any Lake project that pins IM, already built or not (e.g. a Gravity build folder of docs/mass-gap/formal)
+#        quick    (default) the target's own modules: leanchecker replays each one; nanoda checks every declaration of the target
+#                 together with everything it uses, Mathlib and Lean core included, so the second kernel re-checks the whole
+#                 closure the target rests on
+#        full     the whole environment: leanchecker --fresh replays every declaration of the target's closure from nothing, and
+#                 nanoda checks the complete export; hours and about 16 GB of RAM for Mathlib; writes a stamp
+#        --supply      take the checkers, the toolchain and Mathlib's packages from a supply (offline); implies --from-source
+#        --from-source build Mathlib from its source instead of fetching Mathlib's prebuilt files (hours); without it the prebuilt
+#                      files are loaded, and only the kernels' re-check makes them trusted
+#
+# Work folder: $REBUILD_WORK (default ~/.im-rebuild). Exit 0 only when every check passes.
+set -uo pipefail
+IM=$(cd "$(dirname "$0")/.." && pwd)
+ORIG=$PWD
+WORK=${REBUILD_WORK:-$HOME/.im-rebuild}
+CHK=$WORK/checkers; LOG=$WORK/logs
+mkdir -p "$CHK" "$LOG"
+# Every command below names its folder; none depends on where it was started (a git command started inside another checkout would
+# act on that checkout).
+cd "$WORK"
+abs() { case "$1" in /*) printf '%s' "$1";; *) printf '%s/%s' "$ORIG" "$1";; esac; }
+export LC_ALL=C
+STD='["propext","Classical.choice","Quot.sound"]'
+die() { echo "rebuild: $*"; exit 1; }
+say() { echo "== $*"; }
+is_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
+externals() { grep -v '^#' "$IM/externals/EXTERNALS" | grep -v '^$'; }
+ext_field() { externals | awk -F'\t' -v n="$1" -v f="$2" '$1==n{print $f}'; }
+packages() { jq -r '.packages[] | select(.type == "git") | [.name, .url, .rev] | @tsv' "$IM/arsenal/lake-manifest.json" | tr -d '\r'; }
+
+# ---- supply ------------------------------------------------------------------------------------------------------------------------
+# A git External in the supply is a bare repository holding exactly the pinned commit with all its content (history cut at it), as
+# <name>.git.tar, its branch "pin" at the commit. A bundle cannot carry a history cut short, so the repository itself is kept.
+commit_proven() { [ "$(git -C "$1" cat-file commit "$2" 2>/dev/null | git -C "$1" hash-object -t commit --stdin)" = "$2" ]; }
+fetch_repo() {   # name url sha dir
+  local name=$1 url=$2 sha=$3 dir=$4 bare
+  bare=$(mktemp -d); git init -q --bare "$bare"
+  git -C "$bare" fetch -q --depth 1 "$url" "$sha" || { rm -rf "$bare"; return 1; }
+  commit_proven "$bare" "$sha" || { rm -rf "$bare"; return 1; }
+  git -C "$bare" update-ref refs/heads/pin "$sha"
+  git -C "$bare" rev-list --objects "$sha" > /dev/null 2>&1 || { rm -rf "$bare"; return 1; }   # every object of the commit is present
+  tar -C "$bare" -cf "$dir/$name.git.tar" . || { rm -rf "$bare"; return 1; }
+  rm -rf "$bare"
+}
+supply_repo() {   # name -> the supply's repository of that External, unpacked once into the work folder
+  local name=$1 d=$WORK/supply-repos/$1
+  if [ ! -d "$d" ]; then mkdir -p "$d"; tar -C "$d" -xf "$SUPPLY/$name.git.tar" || { rm -rf "$d"; return 1; }; fi
+  printf '%s' "$d"
+}
+cmd_supply() {
+  local dir; dir=$(abs "${1:?usage: tools/rebuild supply <dir>}"); mkdir -p "$dir"; dir=$(cd "$dir" && pwd)
+  local m="$dir/SUPPLY.tsv" name kind src pin f tmp
+  printf '# The supply of IM %s: every External, fetched by its pin and verified (tools/rebuild supply-verify).\n' \
+    "$(git -C "$IM" rev-parse HEAD 2>/dev/null || echo unknown)" > "$m"
+  printf '# name\tfile\tpin\tsha256 of the file\n' >> "$m"
+  while IFS=$'\t' read -r name kind src pin _; do
+    case "$kind" in
+      archive)
+        f=$(basename "$src"); say "supply $name: $f"
+        [ -f "$dir/$f" ] && [ "$(sha256sum "$dir/$f" | cut -d' ' -f1)" = "$pin" ] || curl -sSfL "$src" -o "$dir/$f" || die "$name: download failed"
+        [ "$(sha256sum "$dir/$f" | cut -d' ' -f1)" = "$pin" ] || die "$name: the download does not hash to its pin"
+        printf '%s\t%s\t%s\t%s\n' "$name" "$f" "$pin" "$pin" >> "$m";;
+      git)
+        say "supply $name: ${pin:0:12}"; fetch_repo "$name" "$src" "$pin" "$dir" || die "$name: commit $pin could not be fetched and proven"
+        printf '%s\t%s\t%s\t%s\n' "$name" "$name.git.tar" "$pin" "$(sha256sum "$dir/$name.git.tar" | cut -d' ' -f1)" >> "$m";;
+    esac
+  done < <(externals)
+  while IFS=$'\t' read -r name src pin; do
+    say "supply package $name: ${pin:0:12}"; fetch_repo "pkg-$name" "$src" "$pin" "$dir" || die "package $name: commit $pin could not be fetched and proven"
+    printf '%s\t%s\t%s\t%s\n' "pkg-$name" "pkg-$name.git.tar" "$pin" "$(sha256sum "$dir/pkg-$name.git.tar" | cut -d' ' -f1)" >> "$m"
+  done < <(packages)
+  # nanoda's Rust crates, so that the second kernel builds offline
+  say "supply nanoda's crates"
+  tmp=$(mktemp -d); mkdir -p "$tmp/repo" && tar -C "$tmp/repo" -xf "$dir/nanoda.git.tar" \
+    && git clone -q --branch pin "file://$tmp/repo" "$tmp/nanoda" || die "nanoda: the supply's repository does not open"
+  ( cd "$tmp/nanoda" && cargo vendor --locked -q vendor > /dev/null ) || die "nanoda: cargo vendor failed"
+  tar -C "$tmp/nanoda" -cf "$dir/nanoda-crates.tar" vendor
+  printf '%s\t%s\t%s\t%s\n' "nanoda-crates" "nanoda-crates.tar" "Cargo.lock" "$(sha256sum "$dir/nanoda-crates.tar" | cut -d' ' -f1)" >> "$m"
+  rm -rf "$tmp"
+  cmd_supply_verify "$dir"
+}
+cmd_supply_verify() {
+  local dir m n=0 bad=0 name file pin sum t
+  dir=$(abs "${1:?usage: tools/rebuild supply-verify <dir>}")
+  m="$dir/SUPPLY.tsv"; [ -f "$m" ] || die "no $m: this is not a supply"
+  while IFS=$'\t' read -r name file pin sum; do
+    case "$name" in ''|\#*) continue;; esac
+    if [ ! -f "$dir/$file" ]; then echo "MISSING $name ($file)"; bad=1; continue; fi
+    if [ "$(sha256sum "$dir/$file" | cut -d' ' -f1)" != "$sum" ]; then echo "DIFFERS $name: $file does not hash to the recorded sha256"; bad=1; continue; fi
+    if [[ "$file" == *.git.tar ]]; then   # forth and back again: the commit is in it, and its id recomputes from its content
+      t=$(mktemp -d); tar -C "$t" -xf "$dir/$file" 2>/dev/null
+      if ! commit_proven "$t" "$pin" || [ "$(git -C "$t" rev-parse refs/heads/pin 2>/dev/null)" != "$pin" ]; then
+        echo "DIFFERS $name: the repository does not hold the pinned commit $pin with its content"; rm -rf "$t"; bad=1; continue; fi
+      rm -rf "$t"
+    fi
+    n=$((n + 1))
+  done < "$m"
+  # everything IM pins must be in the supply
+  while IFS=$'\t' read -r name _ _ pin _; do grep -q "^$name	" "$m" || { echo "MISSING $name (pinned in externals/EXTERNALS)"; bad=1; }; done < <(externals)
+  while IFS=$'\t' read -r name _ pin; do grep -q "^pkg-$name	.*	$pin	" "$m" || { echo "MISSING package $name at $pin"; bad=1; }; done < <(packages)
+  [ "$bad" = 0 ] || die "supply-verify: the supply is not complete and verified; a minting refuses to start"
+  echo "supply-verify: OK, $n items, every one at its pin"
+}
+
+# ---- the checkers ------------------------------------------------------------------------------------------------------------------
+TC=$(tr -d '[:space:]' < "$IM/arsenal/lean-toolchain")
+checkout_pin() {   # name url-or-bundle sha dest
+  local name=$1 src=$2 sha=$3 dest=$4
+  if [ -d "$dest/.git" ] && [ "$(git -C "$dest" rev-parse HEAD)" = "$sha" ]; then return 0; fi
+  rm -rf "$dest"; git init -q "$dest"
+  git -C "$dest" fetch -q --depth 1 "$src" "$sha" 2>/dev/null || git -C "$dest" fetch -q --depth 1 "file://$src" pin 2>/dev/null || return 1
+  git -C "$dest" checkout -q --detach FETCH_HEAD && [ "$(git -C "$dest" rev-parse HEAD)" = "$sha" ]
+}
+setup_toolchain() {   # from the supply, or the pinned toolchain already on the PATH (tools/lean-install.sh)
+  if [ -n "${SUPPLY:-}" ]; then
+    local f; f=$(basename "$(ext_field lean 3)")
+    if [ ! -x "$WORK/lean/bin/lean" ]; then
+      mkdir -p "$WORK/lean"; tar --zstd -x -f "$SUPPLY/$f" -C "$WORK/lean" --strip-components=1 || die "the toolchain in the supply does not unpack"
+    fi
+    export PATH="$WORK/lean/bin:$PATH"
+  fi
+  command -v lake >/dev/null && command -v leanchecker >/dev/null || die "lake and leanchecker are not on the PATH: run tools/lean-install.sh, or pass --supply"
+  ( cd "$IM/arsenal/core" && lean --version 2>/dev/null ) | grep -q "version ${TC##*:v}," || die "the Lean on the PATH is not $TC"
+}
+setup_checkers() {
+  local src
+  if [ -n "${SUPPLY:-}" ]; then src=$(supply_repo lean4export); else src=$(ext_field lean4export 3); fi
+  checkout_pin lean4export "$src" "$(ext_field lean4export 4)" "$CHK/lean4export" || die "lean4export: the pinned commit could not be checked out"
+  ( cd "$CHK/lean4export" && echo "$TC" > lean-toolchain && { [ -x .lake/build/bin/lean4export ] || lake build > "$LOG/lean4export-build.log" 2>&1; } ) \
+    || die "lean4export did not build ($LOG/lean4export-build.log)"
+  if [ -n "${SUPPLY:-}" ]; then src=$(supply_repo nanoda); else src=$(ext_field nanoda 3); fi
+  checkout_pin nanoda "$src" "$(ext_field nanoda 4)" "$CHK/nanoda" || die "nanoda: the pinned commit could not be checked out"
+  if [ -n "${SUPPLY:-}" ] && [ ! -d "$CHK/nanoda/vendor" ]; then
+    tar -C "$CHK/nanoda" -xf "$SUPPLY/nanoda-crates.tar"
+    mkdir -p "$CHK/nanoda/.cargo"
+    printf '[source.crates-io]\nreplace-with = "vendored-sources"\n[source.vendored-sources]\ndirectory = "vendor"\n' > "$CHK/nanoda/.cargo/config.toml"
+  fi
+  ( cd "$CHK/nanoda" && cargo build --release --locked ${SUPPLY:+--offline} -q > "$LOG/nanoda-build.log" 2>&1 ) || die "nanoda did not build ($LOG/nanoda-build.log)"
+  NANODA=$(find "$CHK/nanoda/target/release" -maxdepth 1 -type f -name 'nanoda_bin*' -perm -u+x | head -1)
+  [ -x "$NANODA" ] || die "nanoda's binary not found"
+  echo "checkers: leanchecker ($TC), lean4export $(git -C "$CHK/lean4export" rev-parse --short=12 HEAD), nanoda $(git -C "$CHK/nanoda" rev-parse --short=12 HEAD)"
+}
+
+# ---- the target --------------------------------------------------------------------------------------------------------------------
+libs_of() { awk '/^\[\[lean_lib\]\]/{l=1;next} /^\[/{l=0} l&&/^name = /{v=$0; sub(/^name = "/,"",v); sub(/".*/,"",v); print v}' "$1/lakefile.toml"; }
+modules_of() { ( cd "$1"; for l in $(libs_of "$1"); do find "$l" -name '*.lean' 2>/dev/null | sed 's/\.lean$//; s#/#.#g'; [ -f "$l.lean" ] && echo "$l"; done ) | sort -u; }
+# A module name is a prefix for the checkers (a library root would replay every submodule at once), so a root that only imports is left
+# out; a root with declarations of its own is checked like any module.
+has_decls() { grep -qE '^\s*(theorem|lemma|def|instance|structure|class|inductive|abbrev|axiom|opaque|example)\b' "$1"; }
+replay_modules() { local p=$1 m; for m in $(modules_of "$p"); do
+  if modules_of "$p" | grep -q "^$m\." && ! has_decls "$p/$(echo "$m" | tr . /).lean"; then continue; fi; echo "$m"; done; }
+prepare() {   # target -> sets P (the project folder)
+  case "$1" in
+    core|arsenal)
+      P=$WORK/proj/$1; mkdir -p "$P"
+      local from=$IM/arsenal; [ "$1" = core ] && from=$IM/arsenal/core
+      ( cd "$from" && find . -path ./.lake -prune -o -path ./report -prune -o -path ./core -prune -o -type f -print ) | while read -r f; do
+        mkdir -p "$P/$(dirname "$f")"; tr -d '\r' < "$from/$f" > "$P/$f"; done;;
+    *) local t; t=$(abs "$1"); [ -f "$t/lakefile.toml" ] || die "$1 is not a Lake project (no lakefile.toml)"; P=$(cd "$t" && pwd);;
+  esac
+  if grep -q '^\[\[require\]\]' "$P/lakefile.toml"; then
+    if [ -n "${SUPPLY:-}" ]; then   # every package from the supply, at the commit IM pins: nothing fetched
+      local name src pin
+      while IFS=$'\t' read -r name src pin; do
+        checkout_pin "$name" "$(supply_repo "pkg-$name")" "$pin" "$P/.lake/packages/$name" || die "package $name: not in the supply at $pin"
+      done < <(packages)
+      cp "$IM/arsenal/lake-manifest.json" "$P/lake-manifest.json" 2>/dev/null || true
+    elif [ ! -d "$P/.lake/packages/mathlib" ]; then
+      ( cd "$P" && lake update > "$LOG/update.log" 2>&1 ) || die "lake update failed ($LOG/update.log)"
+    fi
+    if [ "${FROM_SOURCE:-0}" = 0 ] && [ ! -d "$P/.lake/packages/mathlib/.lake/build" ]; then
+      ( cd "$P" && lake exe cache get > "$LOG/cache.log" 2>&1 ) || die "Mathlib's prebuilt files could not be fetched ($LOG/cache.log)"
+    fi
+  fi
+  say "build $P ($(modules_of "$P" | wc -l) modules$([ "${FROM_SOURCE:-0}" = 1 ] && grep -q '^\[\[require\]\]' "$P/lakefile.toml" && echo ', Mathlib from source'))"
+  # shellcheck disable=SC2046
+  ( cd "$P" && lake build $(modules_of "$P") > "$LOG/build.log" 2>&1 ) || die "the build failed ($LOG/build.log)"
+  ( cd "$P" && modules_of "$P" | sed 's/^/import /' > CheckAll.lean && mkdir -p .lake/build/lib/lean \
+    && lake env lean -o .lake/build/lib/lean/CheckAll.olean CheckAll.lean ) || die "the root of all modules did not build"
+}
+
+# ---- the two kernels ---------------------------------------------------------------------------------------------------------------
+kernel_lean() {   # quick: each module; full: the whole environment from nothing
+  local mode=$1 m fail=0 n=0
+  if [ "$mode" = full ]; then
+    say "kernel 1, Lean (leanchecker --fresh): every declaration of the closure, from nothing"
+    ( cd "$P" && lake env leanchecker --fresh CheckAll > "$LOG/leanchecker.log" 2>&1 ) || { tail -5 "$LOG/leanchecker.log"; return 1; }
+    echo "kernel 1: accepted the whole environment ($(tail -1 "$LOG/leanchecker.log"))"; return 0
+  fi
+  say "kernel 1, Lean (leanchecker): each module of the target"
+  : > "$LOG/leanchecker.log"
+  for m in $(replay_modules "$P"); do
+    n=$((n + 1))
+    ( cd "$P" && lake env leanchecker "$m" >> "$LOG/leanchecker.log" 2>&1 ) || { echo "FAIL kernel 1: $m"; fail=1; }
+  done
+  [ "$fail" = 0 ] && echo "kernel 1: accepted all $n modules"
+  return $fail
+}
+kernel_nanoda() {
+  local mode=$1 exp=$WORK/export.ndjson permitted=$STD names
+  if [ "$mode" = full ]; then
+    say "kernel 2, nanoda: the complete export of the closure"
+    ( cd "$P" && lake env "$CHK/lean4export/.lake/build/bin/lean4export" CheckAll > "$exp" 2> "$LOG/export.err" ) || { tail -3 "$LOG/export.err"; return 1; }
+    # Lean core itself declares Lean.trustCompiler (the axiom behind native_decide); the whole environment holds it, so it is
+    # permitted here and reported; no declaration of the target may rest on it (kernel 1's report and quick mode refuse it).
+    permitted='["propext","Classical.choice","Quot.sound","Lean.trustCompiler"]'
+  else
+    say "kernel 2, nanoda: every declaration of the target with everything it uses"
+    names=$WORK/names.txt
+    cat > "$P/NamesOf.lean" <<'LEAN'
+import Lean
+import CheckAll
+open Lean
+#eval show CoreM Unit from do
+  let env ← getEnv
+  let some mf ← IO.getEnv "CHECK_MODS" | throwError "CHECK_MODS not set"
+  let some out ← IO.getEnv "CHECK_NAMES" | throwError "CHECK_NAMES not set"
+  let mods := ((← IO.FS.readFile mf).splitOn "\n").filter (· ≠ "") |>.map String.toName
+  let mut acc : Array String := #[]
+  for (nm, _) in env.constants.map₁.toList do
+    if nm.isInternal then continue
+    if let some idx := env.getModuleIdxFor? nm then
+      if mods.contains env.header.moduleNames[idx.toNat]! then acc := acc.push nm.toString
+  IO.FS.writeFile out ("\n".intercalate acc.toList)
+LEAN
+    modules_of "$P" > "$WORK/mods.txt"
+    ( cd "$P" && CHECK_MODS="$WORK/mods.txt" CHECK_NAMES="$names" lake env lean NamesOf.lean ) > "$LOG/names.log" 2>&1 || { tail -3 "$LOG/names.log"; return 1; }
+    rm -f "$P/NamesOf.lean"
+    # shellcheck disable=SC2046
+    ( cd "$P" && lake env "$CHK/lean4export/.lake/build/bin/lean4export" CheckAll -- $(tr '\n' ' ' < "$names") > "$exp" 2> "$LOG/export.err" ) \
+      || { tail -3 "$LOG/export.err"; return 1; }
+  fi
+  jq -n --arg f "$exp" --argjson ax "$permitted" '{export_file_path:$f, use_stdin:false, permitted_axioms:$ax,
+    unpermitted_axiom_hard_error:true, nat_extension:true, string_extension:true, print_success_message:true,
+    num_threads:8, stack_size_bytes:1073741824}' > "$WORK/nanoda.json"
+  "$NANODA" "$WORK/nanoda.json" > "$LOG/nanoda.log" 2>&1
+  local line; line=$(grep -E '^Checked [0-9]+ declarations with no typechecker errors' "$LOG/nanoda.log" | head -1)
+  [ -n "$line" ] || { tail -5 "$LOG/nanoda.log"; echo "FAIL kernel 2: nanoda did not report a clean check"; return 1; }
+  # (nanoda also counts "pretty printer errors"; they concern printing names only, not the check.)
+  echo "kernel 2: $(echo "$line" | sed -E 's/(no typechecker errors).*/\1/') (export $(du -h "$exp" | cut -f1))"
+}
+cmd_check() {
+  local target=${1:?usage: tools/rebuild check <core|arsenal|path> [quick|full] [--supply <dir>] [--from-source]}; shift
+  local mode=quick
+  while [ $# -gt 0 ]; do case "$1" in
+    quick|full) mode=$1;; --supply) SUPPLY=$(cd "$(abs "${2:?}")" && pwd); FROM_SOURCE=1; shift;; --from-source) FROM_SOURCE=1;;
+    *) die "unknown argument $1";; esac; shift; done
+  [ -z "${SUPPLY:-}" ] || cmd_supply_verify "$SUPPLY" || exit 1
+  local t0; t0=$(date +%s)
+  setup_toolchain; setup_checkers; prepare "$target"
+  local fail=0
+  kernel_lean "$mode" || fail=1
+  kernel_nanoda "$mode" || fail=1
+  rm -f "$P/CheckAll.lean" "$P/NamesOf.lean"   # the helpers leave no file in the project (the compiled root stays in .lake)
+  local secs=$(( $(date +%s) - t0 ))
+  if [ "$fail" = 0 ]; then
+    echo "rebuild: OK, $target ($mode), both kernels accept, standard axioms only, ${secs}s"
+    if [ "$mode" = full ]; then
+      { echo "result=PASS"; echo "date=$(date -u +%F)"; echo "target=$target"; echo "im=$(git -C "$IM" rev-parse HEAD 2>/dev/null)"
+        echo "toolchain=$TC"; echo "mathlib=$(jq -r '.packages[]|select(.name=="mathlib")|.rev' "$IM/arsenal/lake-manifest.json")"
+        echo "lean4export=$(git -C "$CHK/lean4export" rev-parse HEAD)"; echo "nanoda=$(git -C "$CHK/nanoda" rev-parse HEAD)"
+        echo "from_source=${FROM_SOURCE:-0}"; echo "export_sha256=$(sha256sum "$WORK/export.ndjson" | cut -d' ' -f1)"; echo "seconds=$secs"
+      } > "$WORK/stamp-$(basename "$target").txt"
+      echo "stamp: $WORK/stamp-$(basename "$target").txt"
+    fi
+  else echo "rebuild: FAILED, $target ($mode); logs in $LOG"; fi
+  return $fail
+}
+
+case "${1:-}" in
+  supply) shift; cmd_supply "$@";;
+  supply-verify) shift; cmd_supply_verify "$@";;
+  check) shift; cmd_check "$@";;
+  *) sed -n 2,26p "$0"; exit 2;;
+esac

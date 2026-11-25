@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # The one gate of IM (DMP chapter 10): the root chain (pins), the setup file, the scrub scan, the build and the tests, then the proof
-# (the Lean closure of the language and the table the tests replayed), then the arsenal's lint (arsenal/README.md). Exit 0 or 1. The verify workflow runs exactly this.
-#   tools/verify            needs the .NET 10 SDK and the pinned Lean toolchain on the PATH (vendor/dmp/SETUP.md; tools/lean-install.sh)
+# (the Lean closure of the language and the table the tests replayed), then the arsenal's lint (arsenal/README.md), then the core checked
+# by two kernels (tools/rebuild check core: Lean's and nanoda). Every trusted hash is first proven back and forth (tools/trust-roundtrip.sh).
+# Exit 0 or 1. The verify workflow runs exactly this.
+#   tools/verify            needs the .NET 10 SDK and the pinned Lean toolchain on the PATH (vendor/dmp/SETUP.md; tools/lean-install.sh),
+#                           git, jq, a C compiler and cargo (the second kernel is built from its pinned source)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 echo "== pins";   tools/check-pin.sh
+echo "== trust";  tools/trust-roundtrip.sh
 echo "== setup";  vendor/dmp/tools/check-setup.sh . im
 echo "== scrub";  LC_ALL=C.UTF-8 tools/scrub-scan.sh
 echo "== build";  dotnet build Im.slnx --nologo -v quiet
@@ -12,4 +16,5 @@ echo "== test";   dotnet test Im.slnx --nologo --no-build -v quiet --logger "con
 echo "== proof";  proof/tools/check.sh
 echo "== arsenal"; arsenal/tools/lint.sh; arsenal/tools/lint-selftest.sh
 echo "== arsenal core"; arsenal/core/tools/check.sh
+echo "== two kernels"; tools/rebuild check core
 echo "verify: OK"

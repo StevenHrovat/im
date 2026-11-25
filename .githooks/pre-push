@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Before every push: every hash the repository trusts is proven back and forth (tools/trust-roundtrip.sh), so nothing is
+# written that cannot be read back. Turn the hooks on once per clone:  git config core.hooksPath .githooks
+exec bash "$(git rev-parse --show-toplevel)/tools/trust-roundtrip.sh"

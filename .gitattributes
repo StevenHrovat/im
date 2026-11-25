@@ -2,3 +2,8 @@
 *.sh text eol=lf
 # Vendored copies are pinned by a hash over their exact bytes: never convert line endings, so a Windows clone matches the pin.
 vendor/** -text
+# Scripts without an extension and the hooks run in bash too: LF everywhere.
+tools/verify text eol=lf
+tools/rebuild text eol=lf
+.githooks/* text eol=lf
+externals/* text eol=lf
