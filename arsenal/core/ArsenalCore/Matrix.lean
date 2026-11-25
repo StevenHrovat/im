@@ -21,7 +21,11 @@ already stated about the first `k` changes.
   where it started, at any length.
 * **The parts measured on 2026-11-25** (`versionUses`, `repoUses`): by version, the uses of DMP, Gravity and IM form a DAG
   (`versions_dag`) and every use is proven (`versions_explained`); collapsed to repositories, IM and Gravity use each other
-  (`repos_cycle`, `repos_not_dag`). A cycle of repositories is a DAG of versions: the two never exist at the same time.
+  (`repos_cycle`, `repos_not_dag`). A cycle of repositories is a DAG of versions: the two never exist at the same time. DMP uses
+  nothing and is included by every other part (`dmp_only_included`).
+* **The drafts, a library transitive to G0** (`draftUses`): each draft grows from the one before, so the drafts form a DAG however
+  many there are (`drafts_dag`, `drafts_no_return`), Draft 6 reaches Draft 4 through Draft 5 (`draft6_reaches_g0`), and in a library
+  of eight drafts every later draft reaches G0 (`every_draft_reaches_g0`).
 
 The facts about the measured tables are decided by the kernel's evaluation; the general facts are proved from Lean's core lemmas.
 -/
@@ -208,5 +212,30 @@ theorem repos_cycle : repoUses 1 2 = true ∧ repoUses 2 1 = true := by decide
 
 /-- **So the repositories are not a DAG**; the versions are (`versions_dag`): the two never exist at the same time. -/
 theorem repos_not_dag : ¬ Earlier 3 repoUses := by decide
+
+/-- **DMP states only inclusion**: by repository, DMP uses nothing (its row is empty) and every other part includes it. -/
+theorem dmp_only_included : (∀ j, j < 3 → repoUses 0 j = false) ∧ repoUses 1 0 = true ∧ repoUses 2 0 = true := by decide
+
+/-! ## The drafts: a library transitive to G0 -/
+
+/-- **The drafts as parts**: Draft `4 + i` is part `i`, and each grows from the one before it (part `i + 1` uses part `i`); part 0,
+Draft 4, is G0. -/
+def draftUses : Table := fun i j => decide (i = j + 1)
+
+/-- **Grown from the one before**: every use points to an earlier draft, so the drafts form a DAG, however many there are. -/
+theorem drafts_dag (k : Nat) : Earlier k draftUses := by
+  intro i _ j _ h
+  have := of_decide_eq_true h
+  omega
+
+/-- **Draft 6 reaches G0 through Draft 5**: it does not grow from Draft 4 directly, yet one derivation step reaches it. -/
+theorem draft6_reaches_g0 : draftUses 2 0 = false ∧ derive 3 draftUses 1 2 0 = true := by decide
+
+/-- **A longer library**: with eight drafts (Draft 4 to Draft 11), three derivation steps reach G0 from every later draft. -/
+theorem every_draft_reaches_g0 : ∀ i, i < 8 → 0 < i → derive 8 draftUses 3 i 0 = true := by decide +kernel
+
+/-- **No draft reaches itself**: the library never returns to where it started, at any number of steps and drafts. -/
+theorem drafts_no_return (k n : Nat) : ∀ i, i < k → derive k draftUses n i i = false :=
+  derive_irrefl (drafts_dag k) n
 
 end ArsenalCore.Matrix
