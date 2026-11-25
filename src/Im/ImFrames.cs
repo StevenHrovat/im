@@ -171,6 +171,23 @@ public static class ImFrames
     }
 }
 
+/// <summary>
+/// The state of one IM channel, seen from the client. <see cref="Moin"/> is the establishment label (the owner's word, his universal
+/// greeting, chosen because it carries no meaning IM already uses): the request is proper, the gate has recognised it, and its
+/// satisfaction is open. The challenge, the door and the response all happen inside Moin; satisfaction ends it.
+/// </summary>
+public enum ImChannelState
+{
+    /// <summary>Nothing sent yet.</summary>
+    Closed,
+    /// <summary>The knock is sent. Whether the request is proper is not known yet: a gate that finds it improper gives the quiet answer.</summary>
+    Knocked,
+    /// <summary>Moin: the request is proper (the gate's accept frame verified) and its satisfaction is open.</summary>
+    Moin,
+    /// <summary>The request is satisfied: the session is established.</summary>
+    Established,
+}
+
 /// <summary>Why the client side gave up on a gate. A code only.</summary>
 public enum ImClientError
 {
@@ -220,6 +237,16 @@ public sealed class ImClientSession(ITrustAnchors trust, IImSigner? device, byte
 
     /// <summary>True once the gate's accept frame has been checked (<see cref="CheckGate"/>).</summary>
     public bool GateChecked => accept is not null;
+
+    /// <summary>
+    /// The channel's state: <see cref="ImChannelState.Closed"/>, <see cref="ImChannelState.Knocked"/>, <see cref="ImChannelState.Moin"/>
+    /// (the request proper, its satisfaction open) or <see cref="ImChannelState.Established"/> (satisfied). It only moves forward.
+    /// </summary>
+    public ImChannelState State =>
+        IsEstablished ? ImChannelState.Established
+        : accept is not null ? ImChannelState.Moin
+        : knock is not null ? ImChannelState.Knocked
+        : ImChannelState.Closed;
 
     public bool IsEstablished { get; private set; }
 

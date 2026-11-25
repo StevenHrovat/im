@@ -187,6 +187,35 @@ public sealed class ImEdgeTests : IDisposable
     }
 
     [Fact]
+    public void The_channel_moves_from_closed_through_moin_to_established_and_a_bad_accept_leaves_it_knocked()
+    {
+        var token = ImTokenCodec.Issue(new ImTokenClaims("d-0001", EnrolledRole.Laptop, ImKeys.SubjectPublicKeyInfo(device.Certificate),
+            [ImKinds.HeartbeatPermission, ImKinds.SessionPermission], Now, Now.AddHours(8)), signer, Now);
+        var gate = ca.Issue(TrustRole.MilkyWayGate, "milky-way", Now.AddDays(-1), Now.AddDays(30));
+        var client = new ImClientSession(ca.Anchors(), device, token, new FixedTime(Now));
+        Assert.Equal(ImChannelState.Closed, client.State);
+
+        var knock = client.Knock(new byte[32]);
+        Assert.Equal(ImChannelState.Knocked, client.State);
+
+        // An improper answer does not make the request proper: the state stays Knocked.
+        var accept = ImFrames.Accept(knock, new byte[ImFrames.ChallengeLength], new byte[ImFrames.SessionIdLength], gate);
+        var parsed = ImFrames.ParseAccept(accept);
+        var broken = new ImWriter().U8((byte)ImFrameType.Accept).Fixed(parsed.Challenge, ImFrames.ChallengeLength).Fixed(parsed.SessionId, ImFrames.SessionIdLength)
+            .List16([[1, 2, 3]], ImLimits.ChainMax, ImLimits.CertificateMax).Fixed(parsed.Signature, ImLimits.SignatureLength).ToArray();
+        Assert.Throws<ImClientException>(() => client.CheckGate(broken));
+        Assert.Equal(ImChannelState.Knocked, client.State);
+
+        // The gate's accept verifies: the request is proper and its satisfaction open. Answering the challenge happens inside Moin.
+        Assert.NotNull(client.Respond(accept));
+        Assert.Equal(ImChannelState.Moin, client.State);
+
+        // Satisfaction ends Moin.
+        client.Established(ImFrames.Established(new byte[ImFrames.SessionIdLength]));
+        Assert.Equal(ImChannelState.Established, client.State);
+    }
+
+    [Fact]
     public void An_accept_whose_gate_chain_is_not_a_certificate_is_malformed_to_the_client()
     {
         var gate = ca.Issue(TrustRole.MilkyWayGate, "milky-way", Now.AddDays(-1), Now.AddDays(30));

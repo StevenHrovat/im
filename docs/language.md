@@ -80,6 +80,28 @@ Nothing else, nothing trailing; an ill-formed sentence (a write that expects `an
 malformed (`ImFormatError.Malformed`), a wrong version byte is `UnknownVersion`. Code: `src/Im/Language/ImSentence.cs`
 (`ImSentence`, `ImSentenceCodec`, `ImLanguage`, the table of kinds).
 
+## The establishment label: Moin
+
+A channel's request is **proper** when the gate recognises it: a knock that passes the gate's checks (its length, its time, its MAC
+against the shared secret, a fresh nonce; DMP chapter 04, "The handshake"). Before that the gate gives the quiet answer; from it on the
+gate answers, with accept or refused. The state in which a request is proper and its **satisfaction is open** is labelled **Moin** (the
+owner, 2026-11-25: his universal greeting, chosen because it carries no meaning IM already uses, so it is unique as a label). Moin lasts
+from the moment the request is recognised as proper until it is satisfied: the challenge, the enrolment door and the response all happen
+inside it, and the established frame ends it.
+
+| State | Seen from the client (`ImClientSession.State`) | The gate |
+|---|---|---|
+| `Closed` | nothing sent | nothing received |
+| `Knocked` | the knock is sent; proper or not is not known yet | an improper knock gets the quiet answer |
+| `Moin` | the gate's accept frame verified: proper, satisfaction open | the knock passed every check; the gate answers |
+| `Established` | the established frame names this session: satisfied | the response passed; messages flow |
+
+The wire does not change: no frame byte and no signed domain string carries the label, which names a state of the exchange, not a field
+of it (`src/Im/ImFrames.cs`, `ImChannelState`; the test `The_channel_moves_from_closed_through_moin_to_established_...`). The owner
+reads the label further: it fits O1 of the paper the root chain carries, the one open step whose request is proper and whose
+satisfaction is open. In the paper's Lean every named open step (`OpenStep`, IM's `R136a1`) is in this state: posed, named, never
+assumed, its satisfaction open.
+
 ## The proof (`proof/`)
 
 The grammar is closed Lean types in Gravity's shape (`vendor/gravity/evidence/Dmp/Recipe.lean`); `Shape.all` lists every kind, mode and
