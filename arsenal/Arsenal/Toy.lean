@@ -24,6 +24,12 @@ bit width (`evens_everywhere`).
 **Reassembly.** Two routes shown separately give a route for the pair (`pair_route`, from `Observable.route_prod`): a bigger proof is
 the parts reassembled as the API guides.
 
+**The string `vxunderground`** (the name of the collective that gave the first author the idea). Converted to binary: its 13 bytes are
+the characters of the string (`vx_eq`) and their bits are listed (`vx_binary`). Read tick by tick, every byte is a lowercase letter,
+certified over the whole string (`vxRead_complete`). Hidden by a half-turn of the 26 letters (rotation by 13) it reads `ikhaqretebhaq`
+(`vx_rot13`); the second half-turn completes the full turn and returns it (`vx_rot13_twice`), and so does any rotation completed to a
+full turn (`vx_rot_complete`, 5 + 21 = 26). Every fact about the string is one kernel evaluation.
+
 Mathlib alone, nothing open.
 -/
 
@@ -117,5 +123,57 @@ theorem counter_byte : ¬ 2 ∣ (bump 8 1 (zero 8)).val := by decide +kernel
 /-- **Reassembled by the API**: a byte and a 16-bit word, each stepping by two, run side by side, have a route. -/
 theorem pair_route : ((evens 8).prod (evens 16)).box.DMPComplete (zero 8, zero 16) :=
   Observable.route_prod (evens_route 8) (evens_route 16)
+
+/-! ## The string `vxunderground`, in binary -/
+
+/-- The string `vxunderground` as its bytes (ASCII). -/
+def vx : List ℕ := [118, 120, 117, 110, 100, 101, 114, 103, 114, 111, 117, 110, 100]
+
+/-- **The conversion**: the bytes are exactly the characters of the string. -/
+theorem vx_eq : "vxunderground".toList.map Char.toNat = vx := by decide
+
+/-- The 8 bits of a byte, most significant first. -/
+def bits (b : ℕ) : List Bool := (List.range 8).reverse.map (fun i => b.testBit i)
+
+/-- **In binary**: the string's 13 bytes as their bits. -/
+theorem vx_binary : vx.map bits = [
+    [false, true, true, true, false, true, true, false], [false, true, true, true, true, false, false, false],
+    [false, true, true, true, false, true, false, true], [false, true, true, false, true, true, true, false],
+    [false, true, true, false, false, true, false, false], [false, true, true, false, false, true, false, true],
+    [false, true, true, true, false, false, true, false], [false, true, true, false, false, true, true, true],
+    [false, true, true, true, false, false, true, false], [false, true, true, false, true, true, true, true],
+    [false, true, true, true, false, true, false, true], [false, true, true, false, true, true, true, false],
+    [false, true, true, false, false, true, false, false]] := by decide
+
+/-- **Reading the string, tick by tick**: the states are the positions, the step moves to the next one, and the claim at a position
+is that the byte there, if any, is a lowercase letter. -/
+def vxRead : Observable :=
+  ⟨ℕ, Nat.succ, fun n => ∀ b ∈ vx[n]?, 97 ≤ b ∧ b ≤ 122, fun _ => Classical.dec _⟩
+
+/-- **Certified over the whole string**: every byte of `vxunderground` is a lowercase letter, at every tick (the 13 bytes checked by
+one kernel evaluation; past the end there is no byte). -/
+theorem vxRead_complete : vxRead.box.DMPComplete (0 : ℕ) := by
+  refine (vxRead.box_complete_iff (0 : ℕ)).2 ?_
+  intro n
+  have hit : (Nat.succ^[n] (0 : ℕ)) = n := by rw [Nat.succ_iterate, zero_add]
+  change ∀ b ∈ vx[Nat.succ^[n] 0]?, 97 ≤ b ∧ b ≤ 122
+  rw [hit]
+  have hall : ∀ b ∈ vx, 97 ≤ b ∧ b ≤ 122 := by decide
+  intro b hb
+  exact hall b (List.mem_of_getElem? hb)
+
+/-! ## Hiding it by a half-turn, and undoing it by the full turn -/
+
+/-- **Rotation of the 26 letters by `k`** (other bytes unchanged). -/
+def rot (k b : ℕ) : ℕ := if 97 ≤ b ∧ b ≤ 122 then 97 + (b - 97 + k) % 26 else b
+
+/-- **The half-turn hides the string**: rotating by 13 gives `ikhaqretebhaq`. -/
+theorem vx_rot13 : (vx.map (rot 13)) = "ikhaqretebhaq".toList.map Char.toNat := by decide
+
+/-- **The full turn undoes it**: two half-turns, 13 + 13 = 26, return the string. -/
+theorem vx_rot13_twice : (vx.map (rot 13)).map (rot 13) = vx := by decide
+
+/-- **A known rotation is undone by completing the turn**: rotating by 5 and then by 21 (5 + 21 = 26) returns the string. -/
+theorem vx_rot_complete : (vx.map (rot 5)).map (rot 21) = vx := by decide
 
 end Arsenal.Toy
