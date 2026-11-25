@@ -40,6 +40,9 @@ equivalent to it), that is the gap `Gap f α`: no zero in the strip at distance 
 * the widths `α ≥ 1/2` hold for free (`gap_of_half_le`);
 * **the open step is GRH itself** (`masullo_gap_iff_grh`): the gap at every width is equivalent to the conclusion. As a
   card, the route moves the whole claim into its one open step; the open step carries all of it.
+  The formalization proved this first, at the level of the trace formula and over every number field
+  (`introTrace_exterior_cancellation_iff_all_zeros_in_window`, `introTrace_cofinal_exterior_cancellation_iff_critical_line`);
+  here it is restated at the zeros.
 
 This module proves nothing that is open. Standard axioms only.
 -/
