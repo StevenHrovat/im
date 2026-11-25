@@ -107,6 +107,40 @@ theorem refuted_by_tick (S : Observable.{u}) {x₀ : S.X} (n : ℕ) (hn : ¬ S.c
     ¬ S.box.DMPComplete x₀ :=
   fun h => hn ((S.box_complete_iff x₀).1 h n)
 
+/-! ## Reassembly: two systems side by side -/
+
+/-- **Reassembly**: two observable systems run side by side; the claim is that both claims hold. -/
+def prod (S T : Observable.{u}) : Observable.{u} :=
+  ⟨S.X × T.X, Prod.map S.step T.step, fun p => S.claim p.1 ∧ T.claim p.2,
+    fun p => @instDecidableAnd _ _ (S.dec p.1) (T.dec p.2)⟩
+
+/-- The pair's description is DMP-complete exactly when both descriptions are. -/
+theorem prod_complete_iff (S T : Observable.{u}) (x : S.X) (y : T.X) :
+    (S.prod T).box.DMPComplete (x, y) ↔ S.box.DMPComplete x ∧ T.box.DMPComplete y := by
+  refine ((S.prod T).box_complete_iff (x, y)).trans ?_
+  rw [box_complete_iff, box_complete_iff]
+  have hit : ∀ n, (S.prod T).step^[n] (x, y) = (S.step^[n] x, T.step^[n] y) := fun n => by
+    show (Prod.map S.step T.step)^[n] (x, y) = _
+    rw [Prod.map_iterate]
+    rfl
+  constructor
+  · intro h
+    refine ⟨fun n => ?_, fun n => ?_⟩
+    · have h' := h n
+      rw [hit] at h'
+      exact (show S.claim _ ∧ T.claim _ from h').1
+    · have h' := h n
+      rw [hit] at h'
+      exact (show S.claim _ ∧ T.claim _ from h').2
+  · rintro ⟨h1, h2⟩ n
+    rw [hit]
+    exact (show S.claim _ ∧ T.claim _ from ⟨h1 n, h2 n⟩)
+
+/-- **Reassembled routes**: routes for two systems give a route for the pair. -/
+theorem route_prod {S T : Observable.{u}} {x : S.X} {y : T.X} (hS : S.box.DMPComplete x) (hT : T.box.DMPComplete y) :
+    (S.prod T).box.DMPComplete (x, y) :=
+  (prod_complete_iff S T x y).2 ⟨hS, hT⟩
+
 /-! ## The observation as a reading, and the gate by one turn -/
 
 /-- **An observable system read against a margin**: the claim at `x` is that the reading `read x` is within the margin `θ`. -/
