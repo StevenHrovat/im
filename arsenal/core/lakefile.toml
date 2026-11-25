@@ -1,0 +1,9 @@
+name = "arsenal-core"
+version = "0.1.0"
+defaultTargets = ["ArsenalCore"]
+
+[leanOptions]
+autoImplicit = false
+
+[[lean_lib]]
+name = "ArsenalCore"

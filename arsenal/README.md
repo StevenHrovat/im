@@ -4,6 +4,14 @@ IM's growing set of transferable Lean results that need Mathlib: content-free pi
 and imported from here only (never copied). Lean v4.34.0 and Mathlib v4.34.0, nothing else. The rest of IM (`proof/`) stays
 Mathlib-free.
 
+**The core (`arsenal/core`)**: the verify toy's finite layer, a package of its own with no requirement at all, not even Mathlib
+(`ArsenalCore.Toy`: the string `vxunderground`, smelly, Moin as the leading zero, and that a bit rotation is never smelly). Every
+statement there is about finitely many bits, so Lean's kernel decides it by evaluation; most rest on no axiom at all. It builds in
+seconds with nothing to download, so `tools/verify`, and with it the verify workflow, builds and audits it on every change
+(`arsenal/core/tools/check.sh`). Mathlib is not trusted here either: the kernel checks every Mathlib proof again. What the arsenal
+takes from Mathlib is its definitions of infinite objects (the complex numbers, the circle, the integral), which no evaluation can
+establish; that layer imports Mathlib as an API.
+
 | Module | What it is |
 |---|---|
 | `Arsenal.R136a1` | The one way to leave a statement open: `R136a1 "name" P`, a named hypothesis, never an axiom (DMP chapters 01 and 06). |

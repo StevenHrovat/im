@@ -11,4 +11,5 @@ echo "== build";  dotnet build Im.slnx --nologo -v quiet
 echo "== test";   dotnet test Im.slnx --nologo --no-build -v quiet --logger "console;verbosity=minimal"
 echo "== proof";  proof/tools/check.sh
 echo "== arsenal"; arsenal/tools/lint.sh; arsenal/tools/lint-selftest.sh
+echo "== arsenal core"; arsenal/core/tools/check.sh
 echo "verify: OK"
