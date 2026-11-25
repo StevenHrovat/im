@@ -120,7 +120,8 @@ theorem full_turn_circle {E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] 
   field_simp
 
 /-- **The factorial is a full turn**: `1 / n!` is one turn of `exp z / z ^ (n + 1)` around `0`, on a circle of any radius
-`R > 0` (at `R = n` the first-order oscillation cancels, and the Gaussian part of the turn is Stirling's `√(2πn)`). -/
+`R > 0`. (An aside, not proved here: at `R = n` the first-order oscillation cancels, and the Gaussian part of the turn is
+Stirling's `√(2πn)`; Mathlib proves Stirling separately, `Stirling.tendsto_stirlingSeq_sqrt_pi`.) -/
 theorem full_turn_factorial (n : ℕ) {R : ℝ} (hR : 0 < R) :
     (2 * Real.pi * I)⁻¹ * ∮ z in C(0, R), (z ^ (n + 1))⁻¹ * exp z = ((n.factorial : ℂ))⁻¹ := by
   have h := full_turn_circle (f := exp) (c := 0) hR n continuous_exp.continuousOn
