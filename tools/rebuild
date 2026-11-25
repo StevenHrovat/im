@@ -11,6 +11,7 @@
 #                                          the API for a repository that uses IM: IM and each repository named, a k by k table whose
 #                                          cell says whether the row proves the column; exit 0 only when every cell is + (see below);
 #                                          --optimize also builds the DAG of versions, optimizes it and exits 3 when it is not settled
+#                                          (4 when the versions are not a DAG)
 #   tools/rebuild check <target> [quick|full] [--supply <dir>] [--from-source]
 #        target   core      IM's finite layer (arsenal/core, no Mathlib)
 #                 arsenal   IM's analytic layer (arsenal/, Mathlib as an API)
@@ -308,7 +309,8 @@ cmd_check() {
 # the row reaches the column through another part it uses); the redundant uses are removed, which is the transitive reduction, the
 # only settled form with the same reach (settled_unique). Printed: every use, kept or redundant with its chain, and the shortest
 # sentences, each chain of kept uses from a part nothing uses to a part that uses nothing, written "a . b . c !". The DAG is settled
-# when the compiled form and the optimized one are the same; exit 3 when they are not (and 1 when the versions are not a DAG).
+# when the compiled form and the optimized one are the same; exit 3 when they are not, and 4 when the versions are not a DAG (then
+# nothing is optimized). A failing cell (exit 1) takes precedence.
 origin_of() { git -C "$1" remote get-url origin 2>/dev/null | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
 norm_url() { printf '%s' "$1" | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
 cmd_matrix() {
@@ -408,6 +410,7 @@ uses_at() {
     [ -n "$src" ] && [ -n "$sha" ] || continue
     case "$f" in
       vendor/*/vendor/*/PIN) par=${f%/vendor/*/PIN}
+        [ -n "$(pin_field "$dir" "$c" "$par/PIN" source)" ] && [ -n "$(pin_field "$dir" "$c" "$par/PIN" commit)" ] || continue
         echo "$(norm_url "$(pin_field "$dir" "$c" "$par/PIN" source)") $(pin_field "$dir" "$c" "$par/PIN" commit) $src $sha held";;
       *) echo "SELF - $src $sha held";;
     esac
@@ -457,7 +460,7 @@ optimize_versions() {
       for (q = 1; q <= m; q++) if (K[p, xs[q]]) { any = 1; say(xs[q], s " . " nm[xs[q]]) }
       if (!any) print "sentence: " s " !" }
     END {
-      for (a = 1; a <= N; a++) if (reach(a, a)) { print "optimizer: FAILED, the versions are not a DAG (" nm[a] " reaches itself)"; exit 1 }
+      for (a = 1; a <= N; a++) if (reach(a, a)) { print "optimizer: FAILED, the versions are not a DAG (" nm[a] " reaches itself)"; exit 4 }
       uses = 0; red = 0
       for (a = 1; a <= N; a++) { m = split(out[a], xs, " ")
         for (q = 1; q <= m; q++) { b = xs[q]; uses++; via = ""

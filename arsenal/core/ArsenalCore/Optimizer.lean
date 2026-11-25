@@ -10,7 +10,9 @@ import ArsenalCore.Matrix
 The explanation mechanism (`ArsenalCore.Matrix`) builds up: a part is added, a cell is derived. The **optimizer** is its mirror: it
 removes every use that is already included through another chain. For each use the question `?` is asked (is this use needed?),
 and the use is removed exactly when it is shown to be unnecessary by `.` (it is already included through another part). What remains is
-the **transitive reduction** of the DAG (Aho, Garey and Ullman 1972).
+the **transitive reduction** of the DAG (Aho, Garey and Ullman 1972). "DAG" here is `Earlier`: the parts are numbered so that every
+use points to an earlier part, which every DAG allows (a topological order), so the general facts hold for every DAG up to
+renumbering.
 
 * **Chains of bounded length** (`path`, `close`): `path k A n i j` says a chain of at most `n` uses leads from `i` to `j` through parts
   below `k`; `close k A i j` is `path` with `i` steps, which is every chain in a DAG (`path_bound`), and chains join (`close_trans`).
@@ -19,7 +21,7 @@ the **transitive reduction** of the DAG (Aho, Garey and Ullman 1972).
 * **What it keeps** (`close_reduce`): on a DAG the reduction reaches exactly what the table reaches, so every derivation, and with it
   every explanation, survives.
 * **Settled** (`Settled`): a table is settled when optimizing it changes nothing, that is, when the compiled table and the optimized
-  one are the same. Optimizing once always settles (`reduce_settled`, `reduce_idem`).
+  one are the same. On a DAG, optimizing once settles (`reduce_settled`, `reduce_idem`).
 * **Nothing more can go** (`reduce_minimal`): removing any kept use loses a derivation.
 * **One settled form** (`settled_unique`, `reduce_unique`): two settled DAGs that reach the same parts are the same table, so the
   reduction is the only settled table with the original's reach. This is the uniqueness of the transitive reduction of a DAG (Aho,
