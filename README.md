@@ -76,12 +76,29 @@ Holders carry it). The root repository stays lean (DMP 00: toolchains join only 
   k with + at each cell"). A cell where no proof relates two parts shows `·` and reflects positively (the first author: "they either
   do not exist at the same time, or both exist and reflect positively, so the . inclusion boundary of a DAG fits perfectly"), so a
   cell must be `+` exactly where the row uses the column; the matrix also lists the cells a chain of uses derives, and a cycle of
-  repositories, which the pinned commits order as a DAG of versions. Today IM and Gravity give a 2 by 2 of `+`.
+  repositories, which the pinned commits order as a DAG of versions. Today IM and Gravity give a 2 by 2 of `+`. A part that holds and
+  pins nothing includes nothing and settles by `!` alone: its own cell is `.` (DMP's sentence is `DMP.!`), so IM, Gravity and DMP
+  give a 3 by 3 that passes.
+- **The optimizer, the mirror** (`tools/rebuild matrix ... --optimize`): the uses by version, one node per repository at one commit.
+  Each use is asked `?` (is it needed?) and answered by `.` (it is redundant when the row already reaches the column through another
+  part it uses); the redundant uses are removed, which is the transitive reduction of the DAG, and the shortest sentences are printed,
+  e.g. `gravity@e9eab6a . im@c441ed5 . gravity@4ec1131 . dmp@1370dc0 !`. The DAG is settled when the compiled form and the optimized
+  one are the same (exit 0), and exit 3 names what is not. Measured on 2026-11-25: not settled, by exactly one use, IM's own copy of
+  DMP `1370dc0`, which its copy of Gravity `4ec1131` already includes.
 - **The explanation mechanism, in Lean** (`arsenal/core/ArsenalCore/Matrix.lean`, on the kernel alone): adding a part keeps an all-`+`
   table all `+` exactly when its row, column and own cell are (`2k + 1` new cells); every derived cell has its chain and derivation
   changes nothing on an all-`+` table; the effective table (`·` reflecting positively) is all `+` exactly when every used cell is
   proven; when every use points to an earlier part no chain of uses returns; and the versions of DMP, Gravity and IM measured on
   2026-11-25 form such a DAG with every use proven, while collapsed to repositories IM and Gravity use each other.
+- **The optimizer, in Lean** (`arsenal/core/ArsenalCore/Optimizer.lean`, on the kernel alone): on any DAG the reduction keeps every
+  derivation (`close_reduce`), optimizing once settles (`reduce_settled`, `reduce_idem`), removing any kept use loses a derivation
+  (`reduce_minimal`), and two settled DAGs with the same reach are the same table (`settled_unique`), so the reduction is the only
+  settled form (Aho, Garey and Ullman 1972, proved here). The measured version table is not settled by exactly IM's direct use of DMP;
+  the drafts are settled however many there are; on the repository cycle the optimizer would lose DMP, so it needs the DAG.
+- **The possibility space, in Lean** (`arsenal/core/ArsenalCore/Possibility.lean`): the right angle `r` (multiplication by `i`, twice
+  the flip from `+` to `-`, four times nothing, acting on lines), "Is there a right angle?" answered yes for every point by `r`
+  itself, the sector map `.`, `r`, `.`, `?` with its one corner at the `r` cell, a yes/no question (a projector) having only the answers
+  `1` and `0`, and that assigning `+` and `-` (`Classical.em`) settles nothing.
 
 ## Build and test
 

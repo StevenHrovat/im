@@ -7,9 +7,10 @@
 #                                          arsenal/lake-manifest.json), recompute each hash, and write the offline supply to <dir>
 #   tools/rebuild supply-verify <dir>      recompute every hash of a supply; exit 1 when anything is missing or differs (a minting
 #                                          refuses to start without a complete, verified supply: DMP 01, G0, mint prep)
-#   tools/rebuild matrix [<repo> ...] [--kernels]
+#   tools/rebuild matrix [<repo> ...] [--kernels] [--optimize]
 #                                          the API for a repository that uses IM: IM and each repository named, a k by k table whose
-#                                          cell says whether the row proves the column; exit 0 only when every cell is + (see below)
+#                                          cell says whether the row proves the column; exit 0 only when every cell is + (see below);
+#                                          --optimize also builds the DAG of versions, optimizes it and exits 3 when it is not settled
 #   tools/rebuild check <target> [quick|full] [--supply <dir>] [--from-source]
 #        target   core      IM's finite layer (arsenal/core, no Mathlib)
 #                 arsenal   IM's analytic layer (arsenal/, Mathlib as an API)
@@ -297,12 +298,22 @@ cmd_check() {
 #                 ArsenalCore/Matrix.lean proves that this is the effective table being all + (allPlus_eff_iff).
 #   derived       a "·" cell that a chain of uses reaches (the row uses a part that uses the column) is listed with its chain; a chain
 #                 that returns to its start is a cycle of repositories, which the pinned commits order as a DAG of versions.
-# A cell that has a relation whose proof fails is "-". Exit 0 only when every cell is +.
+#   includes nothing  a part without a round trip proves nothing, so its own cell is "-"; but a part whose row is empty (it holds and
+#                 pins nothing) includes nothing, and settles by ! alone: its own cell is "." (DMP's sentence is DMP.!). A part
+#                 without a round trip that does use something stays "-".
+# A cell that has a relation whose proof fails is "-". Exit 0 only when every cell is + or ".".
+# --optimize, the mirror (arsenal/core ArsenalCore/Optimizer.lean): the uses by version, one node per repository at one commit (each
+# part at its HEAD, each held copy and pinned commit at its pin, a held copy's own held copies, and the uses of a pinned commit read
+# from the part's history when the commit is there). For each use ? is asked (is it needed?) and . answers it (it is redundant when
+# the row reaches the column through another part it uses); the redundant uses are removed, which is the transitive reduction, the
+# only settled form with the same reach (settled_unique). Printed: every use, kept or redundant with its chain, and the shortest
+# sentences, each chain of kept uses from a part nothing uses to a part that uses nothing, written "a . b . c !". The DAG is settled
+# when the compiled form and the optimized one are the same; exit 3 when they are not (and 1 when the versions are not a DAG).
 origin_of() { git -C "$1" remote get-url origin 2>/dev/null | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
 norm_url() { printf '%s' "$1" | tr -d '\r' | sed -E 's#\.git$##; s#/$##'; }
 cmd_matrix() {
-  local kernels=0 parts=("$IM") p
-  while [ $# -gt 0 ]; do case "$1" in --kernels) kernels=1;; *) p=$(abs "$1"); [ -d "$p" ] || die "$1: no such folder"; parts+=("$(cd "$p" && pwd)");; esac; shift; done
+  local kernels=0 optimize=0 parts=("$IM") p
+  while [ $# -gt 0 ]; do case "$1" in --kernels) kernels=1;; --optimize) optimize=1;; *) p=$(abs "$1"); [ -d "$p" ] || die "$1: no such folder"; parts+=("$(cd "$p" && pwd)");; esac; shift; done
   local k=${#parts[@]} i j names=() urls=() outs=() rcs=()
   for ((i = 0; i < k; i++)); do
     urls[i]=$(origin_of "${parts[i]}"); [ -n "${urls[i]}" ] || die "${parts[i]}: not a git repository with an origin"
@@ -316,7 +327,7 @@ cmd_matrix() {
     fi
   done
   if [ "$kernels" = 1 ]; then say "IM: both kernels on the core"; ( cmd_check core ) || rcs[0]=1; fi
-  local cell why table=() reasons=() all=1 uses=() l
+  local cell why table=() whys=() reasons=() all=1 uses=() l
   for ((i = 0; i < k; i++)); do for ((j = 0; j < k; j++)); do
     cell="·"; why="no proof relates them"
     if [ "$i" = "$j" ]; then
@@ -351,8 +362,16 @@ cmd_matrix() {
         fi
       fi
     fi
-    table[i*k+j]=$cell; reasons+=("${names[i]} -> ${names[j]}: $cell  $why"); [ "$cell" = "-" ] && all=0
+    table[i*k+j]=$cell; whys[i*k+j]=$why
     if [ "$i" != "$j" ] && [ "$cell" != "·" ]; then uses[i*k+j]=1; else uses[i*k+j]=0; fi
+  done; done
+  for ((i = 0; i < k; i++)); do   # a part without a round trip whose row is empty includes nothing: it settles by ! alone
+    [ "${rcs[i]}" = 2 ] || continue
+    local empty=1; for ((j = 0; j < k; j++)); do [ "$i" != "$j" ] && [ "${table[i*k+j]}" != "·" ] && empty=0; done
+    if [ "$empty" = 1 ]; then table[i*k+i]="."; whys[i*k+i]="it holds and pins nothing, so it includes nothing and settles by ! alone (${names[i]}.!)"; fi
+  done
+  for ((i = 0; i < k; i++)); do for ((j = 0; j < k; j++)); do
+    reasons+=("${names[i]} -> ${names[j]}: ${table[i*k+j]}  ${whys[i*k+j]}"); [ "${table[i*k+j]}" = "-" ] && all=0
   done; done
   say "the matrix: the row proves the column"
   local w=12 line c
@@ -369,8 +388,85 @@ cmd_matrix() {
       elif [ "${uses[i*k+j]}" = 0 ]; then echo "derived: ${names[i]} -> ${names[j]} through ${names[l]}"; fi
     done
   done; done
-  if [ "$all" = 1 ]; then echo "matrix: OK, $k by $k, every cell + where the row uses the column, every other cell reflects positively (·)"; return 0; fi
-  echo "matrix: FAILED, a cell is - (a part's own check, or the proof of a use, fails)"; return 1
+  local orc=0
+  if [ "$optimize" = 1 ]; then
+    pdirs=(); pu=()
+    for ((i = 0; i < k; i++)); do pdirs[i]=${parts[i]}; pu[i]=${urls[i]}; done
+    optimize_versions; orc=$?
+  fi
+  if [ "$all" != 1 ]; then echo "matrix: FAILED, a cell is - (a part's own check, or the proof of a use, fails)"; return 1; fi
+  echo "matrix: OK, $k by $k, every cell + where the row uses the column, every other cell reflects positively (·) or includes nothing (.)"
+  return $orc
+}
+
+# The uses at one commit of a part: "<from-url> <from-sha> <to-url> <to-sha> <how>" per line; SELF stands for the part at that commit.
+pin_field() { git -C "$1" show "$2:$3" 2>/dev/null | tr -d '\r' | awk -F'\t' -v k="$4" '$1==k{print $2}'; }
+uses_at() {
+  local dir=$1 c=$2 f src sha par
+  while IFS= read -r f; do
+    src=$(norm_url "$(pin_field "$dir" "$c" "$f" source)"); sha=$(pin_field "$dir" "$c" "$f" commit)
+    [ -n "$src" ] && [ -n "$sha" ] || continue
+    case "$f" in
+      vendor/*/vendor/*/PIN) par=${f%/vendor/*/PIN}
+        echo "$(norm_url "$(pin_field "$dir" "$c" "$par/PIN" source)") $(pin_field "$dir" "$c" "$par/PIN" commit) $src $sha held";;
+      *) echo "SELF - $src $sha held";;
+    esac
+  done < <(git -C "$dir" ls-tree -r --name-only "$c" -- vendor 2>/dev/null | grep -E '^vendor/[^/]+/PIN$|^vendor/[^/]+/vendor/[^/]+/PIN$')
+  while IFS= read -r f; do
+    git -C "$dir" show "$c:$f" 2>/dev/null | tr -d '\r' | awk '
+      function out() { if (r && g != "" && v ~ /^[0-9a-f]+$/ && length(v) == 40) print "SELF - " g " " v " pinned" }
+      /^\[\[/ { out(); r = ($0 ~ /^\[\[require\]\]/); g = ""; v = ""; next }
+      r && /^git = / { x = $0; sub(/^git = "/, "", x); sub(/".*/, "", x); sub(/\.git$/, "", x); sub(/\/$/, "", x); g = x }
+      r && /^rev = / { x = $0; sub(/^rev = "/, "", x); sub(/".*/, "", x); v = x }
+      END { out() }'
+  done < <(git -C "$dir" ls-tree -r --name-only "$c" 2>/dev/null | grep -E '(^|/)lakefile\.toml$' | grep -v '^vendor/')
+}
+
+optimize_versions() {
+  say "the optimizer: the uses by version, each asked ? and answered by ."
+  local edges=$WORK/versions.tsv queue=() seen=" " node url sha d n fu fs tu ts how
+  : > "$edges"
+  for ((n = 0; n < ${#pdirs[@]}; n++)); do queue+=("${pu[n]} $(git -C "${pdirs[n]}" rev-parse HEAD)"); done
+  while [ ${#queue[@]} -gt 0 ]; do
+    node=${queue[0]}; queue=("${queue[@]:1}")
+    case "$seen" in *" $node "*) continue;; esac; seen+="$node "
+    url=${node% *}; sha=${node#* }; d=""
+    for ((n = 0; n < ${#pdirs[@]}; n++)); do
+      if [ "${pu[n]}" = "$url" ] && git -C "${pdirs[n]}" cat-file -e "$sha^{commit}" 2>/dev/null; then d=${pdirs[n]}; break; fi
+    done
+    [ -n "$d" ] || continue   # a commit whose history is not here: its uses are those its holders record (held copies' PINs)
+    while read -r fu fs tu ts how; do
+      if [ "$fu" = SELF ]; then fu=$url; fs=$sha; fi
+      printf '%s\t%s\t%s\n' "$(basename "$fu")@${fs:0:7}" "$(basename "$tu")@${ts:0:7}" "$how" >> "$edges"
+      queue+=("$tu $ts" "$fu $fs")
+    done < <(uses_at "$d" "$sha")
+  done
+  for ((n = 0; n < ${#pdirs[@]}; n++)); do printf '%s\t\t\n' "$(basename "${pu[n]}")@$(git -C "${pdirs[n]}" rev-parse --short=7 HEAD)" >> "$edges"; done
+  sort -u "$edges" | awk -F'\t' '
+    { if (!($1 in id)) { id[$1] = ++N; nm[N] = $1 }
+      if ($2 == "") next
+      if (!($2 in id)) { id[$2] = ++N; nm[N] = $2 }
+      a = id[$1]; b = id[$2]; if (!E[a, b]) { E[a, b] = 1; out[a] = out[a] " " b; hin[b] = 1 } }
+    function reach(a, b,   x, xs, m, q) {   # a chain of one or more uses from a to b
+      if ((a, b) in R) return R[a, b]
+      R[a, b] = 0; m = split(out[a], xs, " ")
+      for (q = 1; q <= m; q++) { x = xs[q]; if (x == b || reach(x, b)) { R[a, b] = 1; break } }
+      return R[a, b] }
+    function say(p, s,   xs, m, q, any) {
+      m = split(out[p], xs, " "); any = 0
+      for (q = 1; q <= m; q++) if (K[p, xs[q]]) { any = 1; say(xs[q], s " . " nm[xs[q]]) }
+      if (!any) print "sentence: " s " !" }
+    END {
+      for (a = 1; a <= N; a++) if (reach(a, a)) { print "optimizer: FAILED, the versions are not a DAG (" nm[a] " reaches itself)"; exit 1 }
+      uses = 0; red = 0
+      for (a = 1; a <= N; a++) { m = split(out[a], xs, " ")
+        for (q = 1; q <= m; q++) { b = xs[q]; uses++; via = ""
+          for (t = 1; t <= m; t++) { c = xs[t]; if (c != b && reach(c, b)) { via = nm[c]; break } }
+          if (via == "") { K[a, b] = 1; print "use: " nm[a] " -> " nm[b] "  ? needed: kept" }
+          else { red++; print "use: " nm[a] " -> " nm[b] "  ? answered by .: redundant, already included through " via } } }
+      for (a = 1; a <= N; a++) if (!hin[a]) say(a, nm[a])
+      if (red == 0) { print "optimizer: OK, settled: " N " versions, " uses " uses, the compiled form and the optimized one are the same"; exit 0 }
+      print "optimizer: NOT SETTLED, " red " of " uses " uses redundant: the optimized form removes them (" N " versions)"; exit 3 }'
 }
 
 case "${1:-}" in
