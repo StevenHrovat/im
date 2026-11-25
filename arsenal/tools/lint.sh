@@ -2,11 +2,12 @@
 # arsenal/tools/lint.sh - the gate of every change to the arsenal: it contains nothing that cannot run, so nothing that cannot be
 # soundly constructed. Static, no network, no build. Exit 0 or 1.
 #
-#   1. the toolchain is Lean v4.34.0 and the one requirement is Mathlib at tag v4.34.0;
-#   2. every module imports only Mathlib or the arsenal's own modules;
+#   1. the toolchain is Lean v4.34.0 and the requirements are exactly two: Mathlib at tag v4.34.0, and the arsenal's own core
+#      (arsenal-core, by path, no library; it holds R136a1, the one token every API input and output carries);
+#   2. every module imports only Mathlib, the arsenal's own modules or the core's (ArsenalCore.*);
 #   3. no module uses an escape hatch (sorry, admit, axiom, native_decide, unsafe, implemented_by, extern, ofReduceBool,
 #      skipKernelTC): everything that is stated is constructed and checked by Lean's kernel. A statement left open is answered
-#      R136a1 instead (Arsenal/R136a1.lean): a named hypothesis, never an axiom. Only code is read, never comments or strings,
+#      R136a1 instead (core/ArsenalCore/R136a1.lean, imported by Arsenal/R136a1.lean): a named hypothesis, never an axiom. Only code is read, never comments or strings,
 #      so the words stay free for prose;
 #   4. every module is reached from Arsenal.lean, so a build of the library builds all of it.
 # It lists every part answered R136a1, by name. tools/lint-selftest.sh shows that each rule fails when it should.
@@ -16,10 +17,12 @@ cd "$(dirname "$0")/.."
 bad=0
 fail() { echo "FAIL $*"; bad=1; }
 
-# 1. toolchain and the one requirement
+# 1. toolchain and the two requirements
 [ "$(tr -d '[:space:]' < lean-toolchain)" = "leanprover/lean4:v4.34.0" ] || fail "lean-toolchain is not leanprover/lean4:v4.34.0"
 reqs="$(grep -c '^\[\[require\]\]' lakefile.toml || true)"
-[ "$reqs" = "1" ] || fail "lakefile.toml has $reqs requirements, the arsenal has exactly one (Mathlib)"
+[ "$reqs" = "2" ] || fail "lakefile.toml has $reqs requirements, the arsenal has exactly two (Mathlib and its own core)"
+grep -qx 'name = "arsenal-core"' lakefile.toml || fail "the core is not required"
+grep -qx 'path = "core"' lakefile.toml || fail "the core is not required by its path"
 grep -qx 'name = "mathlib"' lakefile.toml || fail "the requirement is not Mathlib"
 grep -qx 'rev = "v4.34.0"' lakefile.toml || fail "Mathlib is not pinned to tag v4.34.0"
 
@@ -33,7 +36,7 @@ code() {
 # 2. imports
 for f in "${files[@]}"; do
   while IFS= read -r m; do
-    case "$m" in Mathlib|Mathlib.*|Arsenal.*) ;; *) fail "$f imports $m (only Mathlib and Arsenal.* are allowed)";; esac
+    case "$m" in Mathlib|Mathlib.*|Arsenal.*|ArsenalCore|ArsenalCore.*) ;; *) fail "$f imports $m (only Mathlib, Arsenal.* and ArsenalCore.* are allowed)";; esac
   done < <(code "$f" | sed -n 's/^import[[:space:]]\+//p' | tr ' ' '\n' | grep -v '^$' || true)
 done
 
@@ -62,5 +65,5 @@ done
 # The parts answered R136a1, by name (in code, so a name in prose is not counted).
 outside="$(for f in "${files[@]}"; do perl -0777 -pe 's{/-.*?-/}{}gs; s{--[^\n]*}{}g' "$f"; done | grep -oE 'R136a1 "[^"]+"' | sort -u || true)"
 n_out="$(printf '%s' "$outside" | grep -c . || true)"
-echo "lint: OK (${#files[@]} modules; Mathlib v4.34.0 only; no escape hatch; $n_out part(s) answered R136a1)"
+echo "lint: OK (${#files[@]} modules; Mathlib v4.34.0 and the core only; no escape hatch; $n_out part(s) answered R136a1)"
 if [ "$n_out" != "0" ]; then printf '%s\n' "$outside" | sed 's/^/  outside: /'; fi
