@@ -21,6 +21,9 @@ one statement.
   (Cauchy's formula for derivatives, from Mathlib).
 * `full_turn_factorial`: `1 / n!` is one turn of `exp z / z ^ (n + 1)` around `0`, on a circle of any radius. The factorial is
   a full turn.
+* `full_turn_leading`: if `Λ = (s - c) ^ r g`, one turn of `Λ / (s - c) ^ (r + 1)` gives `g c`, the leading coefficient.
+* `full_turn_order`: one turn of the logarithmic derivative of `(s - c) ^ r g` (with `g` nowhere zero) gives `r`: the order of a
+  zero is a winding number. For an L-function at `s = 1` these are the BSD leading coefficient and the analytic rank.
 
 **The balance** (what one turn forbids).
 * `full_turn_balance`: a positive function on `N ≥ 2` points and its positive full-turn transform cannot both be flat: some
@@ -126,6 +129,79 @@ theorem full_turn_factorial (n : ℕ) {R : ℝ} (hR : 0 < R) :
     simp
   simp only [sub_zero, one_div, smul_eq_mul, hd, mul_one] at h
   exact h
+
+/-- **The leading coefficient is one turn**: if `Λ = (s - c) ^ r g` on the circle and `g` is holomorphic on the disc, one turn of
+`Λ / (s - c) ^ (r + 1)` around `c` gives `g c`, the leading coefficient of `Λ` at `c` (for an L-function at `s = 1` with
+`r` the order of the zero: the BSD leading coefficient, with the `r!` of `Λ^(r)(1) / r!` taken up by the turn). -/
+theorem full_turn_leading {Λ g : ℂ → ℂ} {c : ℂ} {R : ℝ} (hR : 0 < R) (r : ℕ)
+    (hΛ : ∀ z ∈ Metric.sphere c R, Λ z = (z - c) ^ r * g z)
+    (hc : ContinuousOn g (Metric.closedBall c R)) (hd : ∀ z ∈ Metric.ball c R, DifferentiableAt ℂ g z) :
+    (2 * Real.pi * I)⁻¹ * ∮ z in C(c, R), ((z - c) ^ (r + 1))⁻¹ * Λ z = g c := by
+  have h := full_turn_circle hR 0 hc hd
+  simp only [zero_add, pow_one, one_div, iteratedDeriv_zero, Nat.factorial_zero, Nat.cast_one, inv_one,
+    smul_eq_mul, one_mul] at h
+  rw [← h]
+  congr 1
+  apply circleIntegral.integral_congr hR.le
+  intro z hz
+  have hzc : z - c ≠ 0 := by
+    intro h0
+    rw [Metric.mem_sphere, dist_eq_norm, h0, norm_zero] at hz
+    linarith
+  simp only [hΛ z hz]
+  field_simp
+  ring
+
+/-- **The order is a winding number**: if `g` is holomorphic and nowhere zero on a disc of radius `R' > R`, one turn of the
+logarithmic derivative of `(s - c) ^ r g` around `c` gives `r` (the argument principle for one zero of order `r`: for an
+L-function at `s = 1`, the analytic rank). -/
+theorem full_turn_order {g : ℂ → ℂ} {c : ℂ} {R R' : ℝ} (hR : 0 < R) (hRR : R < R') (r : ℕ)
+    (hg : DifferentiableOn ℂ g (Metric.ball c R')) (hg0 : ∀ z ∈ Metric.ball c R', g z ≠ 0) :
+    (2 * Real.pi * I)⁻¹ * ∮ z in C(c, R), deriv (fun s => (s - c) ^ r * g s) z / ((z - c) ^ r * g z) = r := by
+  have hopen : IsOpen (Metric.ball c R') := Metric.isOpen_ball
+  have hsub : Metric.closedBall c R ⊆ Metric.ball c R' := Metric.closedBall_subset_ball hRR
+  have hdg : ∀ z ∈ Metric.ball c R', HasDerivAt g (deriv g z) z :=
+    fun z hz => ((hg z hz).differentiableAt (hopen.mem_nhds hz)).hasDerivAt
+  have hg' : DifferentiableOn ℂ (deriv g) (Metric.ball c R') := hg.deriv hopen
+  -- on the circle the logarithmic derivative splits into r / (z - c) and g' / g
+  have hsplit : Set.EqOn (fun z => deriv (fun s => (s - c) ^ r * g s) z / ((z - c) ^ r * g z))
+      (fun z => (r : ℂ) * (z - c)⁻¹ + deriv g z / g z) (Metric.sphere c R) := by
+    intro z hz
+    have hzR : z ∈ Metric.ball c R' := hsub (Metric.sphere_subset_closedBall hz)
+    have hzc : z - c ≠ 0 := by
+      intro h0
+      rw [Metric.mem_sphere, dist_eq_norm, h0, norm_zero] at hz
+      linarith
+    have hgz := hg0 z hzR
+    have hd : HasDerivAt (fun s => (s - c) ^ r * g s)
+        ((r : ℂ) * (z - c) ^ (r - 1) * 1 * g z + (z - c) ^ r * deriv g z) z := by
+      convert (((hasDerivAt_id z).sub_const c).pow r).mul (hdg z hzR) using 1
+      · funext s; simp
+      · simp
+    dsimp only
+    rw [hd.deriv]
+    rcases r with _ | m
+    · simp
+    · simp only [Nat.add_sub_cancel, Nat.cast_add, Nat.cast_one, pow_succ]
+      field_simp
+  rw [circleIntegral.integral_congr hR.le hsplit]
+  have hint1 : CircleIntegrable (fun z => (r : ℂ) * (z - c)⁻¹) c R :=
+    (ContinuousOn.mul continuousOn_const ((continuousOn_id.sub continuousOn_const).inv₀ (fun z hz h0 => by
+      have h0' : z - c = 0 := by simpa using h0
+      rw [Metric.mem_sphere, dist_eq_norm, h0', norm_zero] at hz; linarith))).circleIntegrable hR.le
+  have hcont2 : ContinuousOn (fun z => deriv g z / g z) (Metric.closedBall c R) :=
+    (hg'.continuousOn.mono hsub).div (hg.continuousOn.mono hsub) (fun z hz => hg0 z (hsub hz))
+  have hint2 : CircleIntegrable (fun z => deriv g z / g z) c R :=
+    (hcont2.mono Metric.sphere_subset_closedBall).circleIntegrable hR.le
+  rw [circleIntegral.integral_add hint1 hint2, circleIntegral.integral_const_mul,
+    circleIntegral.integral_sub_inv_of_mem_ball (Metric.mem_ball_self hR)]
+  have hzero : ∮ z in C(c, R), deriv g z / g z = 0 :=
+    circleIntegral_eq_zero_of_differentiable_on_off_countable hR.le Set.countable_empty hcont2
+      (fun z hz => ((hg'.div hg (fun w hw => hg0 w hw)) z (Metric.ball_subset_ball hRR.le hz.1)).differentiableAt
+        (hopen.mem_nhds (Metric.ball_subset_ball hRR.le hz.1)))
+  rw [hzero, add_zero]
+  have h2 : (2 * Real.pi * I : ℂ) ≠ 0 := two_pi_I_ne_zero
+  field_simp
 
 /-! ## The balance -/
 
