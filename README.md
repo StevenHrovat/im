@@ -69,6 +69,12 @@ Holders carry it). The root repository stays lean (DMP 00: toolchains join only 
   without it Mathlib's prebuilt files are fetched, and only the kernels' re-check makes them trusted. `<path>` is any Lake project
   that pins IM, for example a Gravity build folder of the paper's Lean. `tools/verify` runs `tools/rebuild check core` on every
   change.
+- **The API, a k by k table**: `tools/rebuild matrix <repo> ...` takes IM and the repositories named; the cell in a row and a column
+  says whether the row proves the column (the diagonal: the part's own round trip; off it: the row holds the column, its copy proven
+  back and forth, or pins it, the pinned commit proven), and the command passes only when every cell is `+`. A repository that uses
+  IM asserts exactly that (the first author, 2026-11-25: "gravity can use it as an API, because it just has to assert an array of k by
+  k with + at each cell"). A cell where no proof relates two parts shows `·` and does not count as `+`; whether it may is the first
+  author's decision. Today IM and Gravity give a 2 by 2 of `+`.
 
 ## Build and test
 
