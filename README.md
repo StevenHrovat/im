@@ -73,8 +73,15 @@ Holders carry it). The root repository stays lean (DMP 00: toolchains join only 
   says whether the row proves the column (the diagonal: the part's own round trip; off it: the row holds the column, its copy proven
   back and forth, or pins it, the pinned commit proven), and the command passes only when every cell is `+`. A repository that uses
   IM asserts exactly that (the first author, 2026-11-25: "gravity can use it as an API, because it just has to assert an array of k by
-  k with + at each cell"). A cell where no proof relates two parts shows `·` and does not count as `+`; whether it may is the first
-  author's decision. Today IM and Gravity give a 2 by 2 of `+`.
+  k with + at each cell"). A cell where no proof relates two parts shows `·` and reflects positively (the first author: "they either
+  do not exist at the same time, or both exist and reflect positively, so the . inclusion boundary of a DAG fits perfectly"), so a
+  cell must be `+` exactly where the row uses the column; the matrix also lists the cells a chain of uses derives, and a cycle of
+  repositories, which the pinned commits order as a DAG of versions. Today IM and Gravity give a 2 by 2 of `+`.
+- **The explanation mechanism, in Lean** (`arsenal/core/ArsenalCore/Matrix.lean`, on the kernel alone): adding a part keeps an all-`+`
+  table all `+` exactly when its row, column and own cell are (`2k + 1` new cells); every derived cell has its chain and derivation
+  changes nothing on an all-`+` table; the effective table (`·` reflecting positively) is all `+` exactly when every used cell is
+  proven; when every use points to an earlier part no chain of uses returns; and the versions of DMP, Gravity and IM measured on
+  2026-11-25 form such a DAG with every use proven, while collapsed to repositories IM and Gravity use each other.
 
 ## Build and test
 

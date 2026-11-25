@@ -5,7 +5,8 @@ and imported from here only (never copied). Lean v4.34.0 and Mathlib v4.34.0, no
 Mathlib-free.
 
 **The core (`arsenal/core`)**: the verify toy's finite layer, a package of its own with no requirement at all, not even Mathlib
-(`ArsenalCore.Toy`: the string `vxunderground`, smelly, Moin as the leading zero, and that a bit rotation is never smelly). The facts
+(`ArsenalCore.Toy`: the string `vxunderground`, smelly, Moin as the leading zero, and that a bit rotation is never smelly;
+`ArsenalCore.Matrix`: the explanation mechanism, k by k tables of proofs, their extension, derivation and the DAG of versions). The facts
 about bytes and the string are decided by the kernel's evaluation; the general facts about `n`-bit words are proved from Lean's core
 lemmas on natural numbers; most rest on no axiom at all. It builds in seconds with nothing to download, so `tools/verify`, and with it
 the verify workflow, builds and audits it on every change (`arsenal/core/tools/check.sh`). Lean need not trust a library: every Mathlib proof is a term that a small kernel can check again (the de Bruijn
