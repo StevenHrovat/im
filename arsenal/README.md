@@ -50,6 +50,13 @@ arsenal/tools/check.sh           # the full check: lint, build against Mathlib (
 `tools/verify` (IM's one gate) runs the lint and its self-test. The full check needs Mathlib's prebuilt files, so it runs where the arsenal
 is used: Gravity's builds import it and audit every declaration they depend on.
 
+## The card check
+
+[`card-check/`](card-check/README.md): the arsenal's gate as a GitHub Action for any Lean project. The statements build against the
+project's Mathlib, carry no escape hatch, rest on the three standard axioms at most, and each declaration's route (the outside
+inputs it names R136a1) and derivation are reported. It decides no statement and finds no proof; it shows what is proved and what
+rests on what.
+
 ## Using it
 
 In a Lake project on Lean v4.34.0 with Mathlib v4.34.0:

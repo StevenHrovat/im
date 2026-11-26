@@ -1,0 +1,43 @@
+name: Card check
+description: >-
+  For a Lean project: its statements are well-formed (they build against its Mathlib), carry no escape hatch, rest on
+  propext, Quot.sound and Classical.choice at most, and show their route (the outside inputs named R136a1) and derivation.
+  It does not decide whether a statement is true or find proofs; no check can.
+inputs:
+  project:
+    description: The Lake project's folder, relative to the repository root.
+    default: .
+  modules:
+    description: The Lean modules to check, separated by spaces.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Lean (elan; the project's lean-toolchain picks the version)
+      shell: bash
+      run: |
+        if ! command -v elan >/dev/null 2>&1 && [ ! -x "$HOME/.elan/bin/elan" ]; then
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --no-modify-path --default-toolchain none
+        fi
+        echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+    - name: Mathlib's prebuilt files, when the project requires Mathlib
+      shell: bash
+      working-directory: ${{ inputs.project }}
+      run: |
+        if grep -q '"name": "mathlib"' lake-manifest.json 2>/dev/null; then lake exe cache get; fi
+    - name: The card check
+      shell: bash
+      env:
+        PROJECT: ${{ inputs.project }}
+        MODULES: ${{ inputs.modules }}
+      run: |
+        # shellcheck disable=SC2086 # the module list is split into words on purpose
+        "$GITHUB_ACTION_PATH/card-check.sh" "$PROJECT" $MODULES
+    - name: The report, in the job summary
+      if: always()
+      shell: bash
+      env:
+        PROJECT: ${{ inputs.project }}
+      run: |
+        r="$PROJECT/card-check-report/report.txt"
+        if [ -f "$r" ]; then { echo '### Card check'; echo '```'; cat "$r"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"; fi
