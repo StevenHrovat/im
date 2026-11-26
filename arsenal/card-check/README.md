@@ -12,6 +12,28 @@ A GitHub Action (and the script behind it) that gives any Lean project the arsen
    declaration of type `Arsenal.Problems.Card` is listed as a card. The report goes to the job summary and to
    `card-check-report/report.txt`.
 
+## Credit
+
+A correct DMP route is a DAG, and the route is the credit: who formulated each step the result is built on. In Lean the derivation
+is a DAG by construction (a declaration is admitted only after everything it uses), so the check prints it as a path:
+
+```
+credit: DMP.GRH.R136a1.RHLibrary.Problems.riemann_of_library (GRH: derived)
+credit: DMP.GRH.Problems.poincare (GRH: reading)
+```
+
+`DMP.`, then `GRH.`, then the modules of the declaration's derivation in import order (each after everything it imports; the
+arsenal's modules by their own name), then the declaration.
+
+* **`DMP.GRH.` starts every route.** The first author's reading (2026-11-26): binary is the shape of a problem, and GRH is a
+  universal decoder for binary, so every route of the problem card API starts at GRH. The first half rests on a proof: a yes/no
+  question has exactly two answers (`ArsenalCore.Possibility.answers_of_idem`). The second half, GRH as the universal decoder, is
+  the reading.
+* **Derived or reading.** `GRH: derived` when the declaration's derivation passes through `Arsenal.GRH` (RH's does: the arsenal's
+  ladder from GRH down to RH, `Arsenal.GRH.riemannHypothesis_of_dirichlet`). `GRH: reading` otherwise (Poincaré, P ≠ NP and BSD use
+  nothing of `Arsenal.GRH`): there the root is the reading above, not a step the kernel checked. The two are kept apart, so the
+  check never reports a derivation that the kernel does not show.
+
 **What it cannot do.** It does not decide whether a statement is true and does not find proofs: no program can, for every
 statement (Turing 1936; in Mathlib, `ComputablePred.halting_problem`). A module the check passes is well-formed and honest about
 what it rests on. A card in it is solved only where a proof is there, in the module or named as an outside input.

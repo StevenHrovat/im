@@ -54,8 +54,9 @@ is used: Gravity's builds import it and audit every declaration they depend on.
 
 [`card-check/`](card-check/README.md): the arsenal's gate as a GitHub Action for any Lean project. The statements build against the
 project's Mathlib, carry no escape hatch, rest on the three standard axioms at most, and each declaration's route (the outside
-inputs it names R136a1) and derivation are reported. It decides no statement and finds no proof; it shows what is proved and what
-rests on what.
+inputs it names R136a1) and derivation are reported, with each route as its credit path from `DMP.GRH.` (GRH marked derived where
+the proof goes through `Arsenal.GRH`, the first author's reading otherwise). It decides no statement and finds no proof; it shows
+what is proved and what rests on what.
 
 ## Using it
 

@@ -3,7 +3,8 @@
 # arsenal for the run and removed after it (needs the arsenal built against Mathlib, as tools/check.sh does).
 #   1. a `sorry` in a checked module: refused by the source scan;
 #   2. an axiom declared in an unchecked module and used in a checked one: refused by the kernel's axiom report;
-#   3. a card with its outside input named R136a1: passes, the card and the input listed.
+#   3. a card with its outside input named R136a1: passes, the card and the input listed, its credit root GRH by reading;
+#   4. Arsenal.Problems: RH's route through the GRH ladder has its credit root GRH derived.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 dir=Arsenal/CardCheckSelftest
@@ -27,4 +28,11 @@ run Arsenal.CardCheckSelftest.Good || { cat "$dir/out.txt"; echo "selftest FAIL:
 grep -q '1 card(s)' "$dir/out.txt" && grep -q 'planted outside input' "$dir/out.txt" \
   || { cat "$dir/out.txt"; echo "selftest FAIL: the card or its input is not listed"; exit 1; }
 echo "selftest ok: a good card passes, the card and its outside input listed"
+grep -q 'credit: DMP.GRH.Problems.CardCheckSelftest.Good.twoPrimes (GRH: reading)\|credit: DMP.GRH.*twoPrimes (GRH: reading)' card-check-report/report.txt \
+  || { grep credit card-check-report/report.txt | head; echo "selftest FAIL: the good card's credit path is not DMP.GRH. by reading"; exit 1; }
+echo "selftest ok: a card that does not use GRH has the credit root GRH by reading"
+run Arsenal.Problems || { cat "$dir/out.txt"; echo "selftest FAIL: Arsenal.Problems was refused"; exit 1; }
+grep -q 'credit: DMP.GRH.R136a1.RHLibrary.Problems.riemann_of_library (GRH: derived)' card-check-report/report.txt \
+  || { grep -A6 'riemann_of_library' card-check-report/report.txt | head; echo "selftest FAIL: RH's route through GRH is not derived"; exit 1; }
+echo "selftest ok: RH's route through the arsenal's GRH ladder has the credit root GRH derived"
 echo "card-check selftest: OK"

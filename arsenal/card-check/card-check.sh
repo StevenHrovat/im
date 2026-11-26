@@ -12,7 +12,8 @@
 #   4. the route of every declaration: the outside inputs its statement names (`R136a1 "name" P`, the arsenal's one way to
 #      leave a statement open, seen through the definitions of the checked modules and of the arsenal), and its derivation
 #      (the declarations of the checked modules and of the arsenal its proof uses directly); a declaration of type
-#      `Arsenal.Problems.Card` is listed as a card.
+#      `Arsenal.Problems.Card` is listed as a card. Its credit path: `DMP.GRH.`, the modules of its derivation (a DAG) in import
+#      order, its name; GRH marked derived when the derivation passes through Arsenal.GRH, a reading otherwise (README.md, Credit).
 # What it cannot do, by a theorem and not a gap: decide whether a statement is true, or find a proof. A card the check passes is
 # well-formed and honest about what it rests on; it is solved only where a proof is there.
 # The report is written to <project-dir>/card-check-report/report.txt.
@@ -49,11 +50,13 @@ modlist="$(printf '`%s,' "${mods[@]}" | sed 's/,$//')"
   cat <<LEAN
 open Lean
 
+namespace CardCheck
+
 /-- In scope: the checked modules and the arsenal's. Their definitions are unfolded to find outside inputs; their declarations
 count as derivation steps. -/
 def inScope (env : Environment) (mods : List Name) (n : Name) : Bool :=
   match env.getModuleIdxFor? n with
-  | some idx => let m := env.header.moduleNames[idx.toNat]!; mods.contains m || m.getRoot == \`Arsenal
+  | some idx => let m := env.header.moduleNames[idx.toNat]!; mods.contains m || m.getRoot == \`Arsenal || m.getRoot == \`ArsenalCore
   | none => false
 
 /-- The outside inputs an expression names: every \`R136a1 "name" _\`, through the in-scope definitions it mentions. -/
@@ -78,12 +81,47 @@ partial def outside (env : Environment) (mods : List Name) (e : Expr) : StateM (
   | .mdata _ b | .proj _ _ b => outside env mods b
   | _ => pure ()
 
+/-- The modules of a declaration's derivation, a DAG (Lean admits a declaration only after everything it uses): its own
+module and those of every in-scope declaration its statement and proof use, transitively. Memoized: each declaration once. -/
+partial def derivMods (env : Environment) (mods : List Name) (n : Name) : StateM (Std.HashMap Name NameSet) NameSet := do
+  if let some r := (← get).get? n then return r
+  let mut r : NameSet := {}
+  if let some idx := env.getModuleIdxFor? n then r := r.insert env.header.moduleNames[idx.toNat]!
+  if let some ci := env.find? n then
+    let cs := ci.type.getUsedConstants ++ ((ci.value? (allowOpaque := true)).map (·.getUsedConstants) |>.getD #[])
+    for c in cs do
+      if c != n && inScope env mods c && !c.isInternal then
+        for m in (← derivMods env mods c) do r := r.insert m
+  modify (·.insert n r)
+  return r
+
+/-- A module's segment of the credit path: the arsenal's modules by their own name (GRH for Arsenal.GRH). -/
+def segment (m : Name) : String :=
+  if m.getRoot == \`Arsenal || m.getRoot == \`ArsenalCore then (m.replacePrefix m.getRoot .anonymous).toString else m.toString
+
+/-- The credit path of a declaration: DMP.GRH., then the modules of its derivation in import order (each after everything it
+imports), then its own name. GRH is derived when the derivation passes through Arsenal.GRH, the first author's reading otherwise
+(card-check/README.md, Credit). -/
+def credit (env : Environment) (mods : List Name) (n : Name) : StateM (Std.HashMap Name NameSet) (String × Bool) := do
+  let ms ← derivMods env mods n
+  let order := env.header.moduleNames.toList.filter ms.contains
+  let viaGRH := order.contains \`Arsenal.GRH
+  let segs := (order.filter (· != \`Arsenal.GRH)).map segment
+  let own := match env.getModuleIdxFor? n with
+    | some idx => let m := env.header.moduleNames[idx.toNat]!; if m.isPrefixOf n then n.replacePrefix m .anonymous else n
+    | none => n
+  return ("DMP.GRH." ++ ".".intercalate (segs ++ [own.toString]), viaGRH)
+
+end CardCheck
+
+open CardCheck in
 #eval show CoreM Unit from do
   let env ← getEnv
   let mods : List Name := [$modlist]
   let mut n := 0
   let mut nonstd := 0
   let mut cards := 0
+  let mut memo : Std.HashMap Name NameSet := {}
   let decls := env.constants.map₁.toList.filter fun (nm, _) =>
     !nm.isInternal && match env.getModuleIdxFor? nm with
       | some idx => mods.contains env.header.moduleNames[idx.toNat]!
@@ -102,6 +140,9 @@ partial def outside (env : Environment) (mods : List Name) (e : Expr) : StateM (
     if let some v := ci.value? (allowOpaque := true) then
       let uses := v.getUsedConstants.filter fun c => c != nm && !c.isInternal && inScope env mods c
       if !uses.isEmpty then IO.println s!"  uses: {uses.toList}"
+    let ((path, viaGRH), memo') := (credit env mods nm).run memo
+    memo := memo'
+    IO.println s!"  credit: {path} (GRH: {if viaGRH then "derived" else "reading"})"
   IO.println s!"COUNT {n} NONSTD {nonstd} CARDS {cards}"
 LEAN
 } > card-check-report/Report.lean
